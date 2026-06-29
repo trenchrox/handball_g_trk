@@ -1,0 +1,9 @@
+{
+  "name": "Handboll Målvakt Tracker",
+  "short_name": "Handboll Tracker",
+  "start_url": "./handball_g_trk_ipad.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": []
+}
