@@ -96,6 +96,10 @@
   nav .brand .brand-name b { color: var(--accent); font-weight: 700; }
   nav .brand .brand-sub { font-size: 10px; font-weight: 700; letter-spacing: 0.22em; color: var(--ink-faint);
     text-transform: uppercase; margin-top: 6px; }
+  /* Med en laglogga uppe är klubben avsändaren – då får appnamnet halva storleken. */
+  nav .brand.has-logo .brand-logo { margin-bottom: 8px; }
+  nav .brand.has-logo .brand-name { font-size: 15px; }
+  nav .brand.has-logo .brand-sub { font-size: 8px; letter-spacing: 0.16em; margin-top: 3px; }
   .navlink {
     display: flex; align-items: center; gap: 13px; width: 100%; text-align: left;
     background: transparent; color: var(--ink-dim); border-radius: 0;
@@ -504,7 +508,9 @@
     html, body { overflow: visible; height: auto; background: #fff; color: #000; display: block; }
     #printArea { display: block; padding: 20px; font-family: -apple-system, system-ui, sans-serif; }
     #printArea h1 { font-size: 22px; margin: 0 0 2px; }
-    #printArea .pdate { color: #555; font-size: 13px; margin-bottom: 18px; }
+    #printArea .phead { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+    #printArea .plogo { max-height: 64px; max-width: 110px; object-fit: contain; }
+    #printArea .pdate { color: #555; font-size: 13px; }
     #printArea .pteams { display: flex; flex-wrap: wrap; gap: 24px; }
     #printArea .pteam { min-width: 200px; }
     #printArea .pteam h2 { font-size: 16px; margin: 0 0 6px; border-bottom: 2px solid #000; padding-bottom: 4px;
@@ -540,6 +546,12 @@
     <div class="panel">
       <label class="fld">Truppens namn (valfritt)</label>
       <input id="wName" placeholder="t.ex. P12 IFK Handboll" autocomplete="off">
+      <label class="fld">Laglogga (valfritt)</label>
+      <div class="logo-pick" style="margin-bottom:14px;justify-content:center">
+        <span class="logo-prev" id="wLogoPrev"></span>
+        <label class="topbtn upload"><span data-svg="upload"></span> Välj bild<input id="wLogoFile" type="file" accept="image/*" style="display:none"></label>
+        <button class="topbtn hidden" id="wLogoDel">Ta bort</button>
+      </div>
       <label class="fld">PIN för nivåflik (4–6 siffror, valfritt)</label>
       <input id="wPin" type="password" inputmode="numeric" maxlength="6" placeholder="Kan sättas senare" autocomplete="off">
       <button class="primary block" id="wGo">Kom igång</button>
@@ -1113,6 +1125,7 @@ function renderBrandLogo(){
     brandLogoShown=url;
   }
   box.classList.toggle('hidden',!url);
+  box.parentNode.classList.toggle('has-logo',!!url);
 }
 // Loggan skalas ner till max 256 px och sparas som PNG så att genomskinliga
 // klubbmärken behåller sin bakgrund i både mörkt och ljust läge.
@@ -2267,7 +2280,8 @@ function cycleVest(team){
 /* ---------- Utskrift (endast namn och lag – aldrig nivådata) ---------- */
 function printTeams(title,teams){
   const pa=$('printArea');
-  pa.innerHTML='<h1>'+esc(title)+'</h1><div class="pdate">'+new Date().toLocaleDateString('sv-SE',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'</div>'+
+  pa.innerHTML='<div class="phead">'+(root.logo?'<img class="plogo" src="'+root.logo+'" alt="">':'')+
+    '<div><h1>'+esc(title)+'</h1><div class="pdate">'+new Date().toLocaleDateString('sv-SE',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'</div></div></div>'+
     '<div class="pteams">'+teams.map(t=>'<div class="pteam"><h2>'+esc(t.name)+'</h2><ol>'+
       t.playerIds.map(id=>{ const p=pById(id); return '<li>'+esc(p?p.name:'?')+'</li>'; }).join('')+'</ol></div>').join('')+'</div>';
   window.print();
@@ -2656,10 +2670,23 @@ $('resetAllBtn').onclick=()=>confirmModal('Nollställa allt?','All data på den 
 /* =====================================================================
    Onboarding & boot
    ===================================================================== */
+// Loggan kan väljas redan i välkomstrutan och följer med när truppen skapas.
+let welcomeLogo=null;
+function renderWelcomeLogo(){
+  $('wLogoPrev').innerHTML=welcomeLogo?'<img src="'+welcomeLogo+'" alt="">':'';
+  $('wLogoDel').classList.toggle('hidden',!welcomeLogo);
+}
+$('wLogoFile').onchange=e=>{
+  const f=e.target.files[0]; e.target.value='';
+  if(!f) return;
+  readLogoFile(f,url=>{ welcomeLogo=url; renderWelcomeLogo(); });
+};
+$('wLogoDel').onclick=()=>{ welcomeLogo=null; renderWelcomeLogo(); };
 $('wGo').onclick=async()=>{
   const pin=$('wPin').value;
   if(pin&&!validPinFormat(pin)){ toast('PIN måste vara 4–6 siffror'); return; }
   root.squadName=$('wName').value.trim();
+  root.logo=welcomeLogo;
   if(pin) S().pinHash=await hashPin(pin);
   root.onboarded=true; save();
   $('welcome').classList.add('hidden');

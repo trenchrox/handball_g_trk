@@ -8,6 +8,12 @@
     <div class="panel">
       <label class="fld">Truppens namn (valfritt)</label>
       <input id="wName" placeholder="t.ex. P12 IFK Handboll" autocomplete="off">
+      <label class="fld">Laglogga (valfritt)</label>
+      <div class="logo-pick" style="margin-bottom:14px;justify-content:center">
+        <span class="logo-prev" id="wLogoPrev"></span>
+        <label class="topbtn upload"><span data-svg="upload"></span> Välj bild<input id="wLogoFile" type="file" accept="image/*" style="display:none"></label>
+        <button class="topbtn hidden" id="wLogoDel">Ta bort</button>
+      </div>
       <label class="fld">PIN för nivåflik (4–6 siffror, valfritt)</label>
       <input id="wPin" type="password" inputmode="numeric" maxlength="6" placeholder="Kan sättas senare" autocomplete="off">
       <button class="primary block" id="wGo">Kom igång</button>

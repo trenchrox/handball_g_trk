@@ -345,6 +345,7 @@ function renderBrandLogo(){
     brandLogoShown=url;
   }
   box.classList.toggle('hidden',!url);
+  box.parentNode.classList.toggle('has-logo',!!url);
 }
 // Loggan skalas ner till max 256 px och sparas som PNG så att genomskinliga
 // klubbmärken behåller sin bakgrund i både mörkt och ljust läge.
@@ -1499,7 +1500,8 @@ function cycleVest(team){
 /* ---------- Utskrift (endast namn och lag – aldrig nivådata) ---------- */
 function printTeams(title,teams){
   const pa=$('printArea');
-  pa.innerHTML='<h1>'+esc(title)+'</h1><div class="pdate">'+new Date().toLocaleDateString('sv-SE',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'</div>'+
+  pa.innerHTML='<div class="phead">'+(root.logo?'<img class="plogo" src="'+root.logo+'" alt="">':'')+
+    '<div><h1>'+esc(title)+'</h1><div class="pdate">'+new Date().toLocaleDateString('sv-SE',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'</div></div></div>'+
     '<div class="pteams">'+teams.map(t=>'<div class="pteam"><h2>'+esc(t.name)+'</h2><ol>'+
       t.playerIds.map(id=>{ const p=pById(id); return '<li>'+esc(p?p.name:'?')+'</li>'; }).join('')+'</ol></div>').join('')+'</div>';
   window.print();
@@ -1888,10 +1890,23 @@ $('resetAllBtn').onclick=()=>confirmModal('Nollställa allt?','All data på den 
 /* =====================================================================
    Onboarding & boot
    ===================================================================== */
+// Loggan kan väljas redan i välkomstrutan och följer med när truppen skapas.
+let welcomeLogo=null;
+function renderWelcomeLogo(){
+  $('wLogoPrev').innerHTML=welcomeLogo?'<img src="'+welcomeLogo+'" alt="">':'';
+  $('wLogoDel').classList.toggle('hidden',!welcomeLogo);
+}
+$('wLogoFile').onchange=e=>{
+  const f=e.target.files[0]; e.target.value='';
+  if(!f) return;
+  readLogoFile(f,url=>{ welcomeLogo=url; renderWelcomeLogo(); });
+};
+$('wLogoDel').onclick=()=>{ welcomeLogo=null; renderWelcomeLogo(); };
 $('wGo').onclick=async()=>{
   const pin=$('wPin').value;
   if(pin&&!validPinFormat(pin)){ toast('PIN måste vara 4–6 siffror'); return; }
   root.squadName=$('wName').value.trim();
+  root.logo=welcomeLogo;
   if(pin) S().pinHash=await hashPin(pin);
   root.onboarded=true; save();
   $('welcome').classList.add('hidden');

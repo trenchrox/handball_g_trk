@@ -81,6 +81,10 @@
   nav .brand .brand-name b { color: var(--accent); font-weight: 700; }
   nav .brand .brand-sub { font-size: 10px; font-weight: 700; letter-spacing: 0.22em; color: var(--ink-faint);
     text-transform: uppercase; margin-top: 6px; }
+  /* Med en laglogga uppe är klubben avsändaren – då får appnamnet halva storleken. */
+  nav .brand.has-logo .brand-logo { margin-bottom: 8px; }
+  nav .brand.has-logo .brand-name { font-size: 15px; }
+  nav .brand.has-logo .brand-sub { font-size: 8px; letter-spacing: 0.16em; margin-top: 3px; }
   .navlink {
     display: flex; align-items: center; gap: 13px; width: 100%; text-align: left;
     background: transparent; color: var(--ink-dim); border-radius: 0;
@@ -489,7 +493,9 @@
     html, body { overflow: visible; height: auto; background: #fff; color: #000; display: block; }
     #printArea { display: block; padding: 20px; font-family: -apple-system, system-ui, sans-serif; }
     #printArea h1 { font-size: 22px; margin: 0 0 2px; }
-    #printArea .pdate { color: #555; font-size: 13px; margin-bottom: 18px; }
+    #printArea .phead { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+    #printArea .plogo { max-height: 64px; max-width: 110px; object-fit: contain; }
+    #printArea .pdate { color: #555; font-size: 13px; }
     #printArea .pteams { display: flex; flex-wrap: wrap; gap: 24px; }
     #printArea .pteam { min-width: 200px; }
     #printArea .pteam h2 { font-size: 16px; margin: 0 0 6px; border-bottom: 2px solid #000; padding-bottom: 4px;
