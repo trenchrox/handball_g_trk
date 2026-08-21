@@ -1,0 +1,228 @@
+
+<!-- ---------- Onboarding ---------- -->
+<div id="welcome" class="hidden">
+  <div class="glow"></div>
+  <div class="wrap">
+    <div class="app-title">Team<b>builder</b></div>
+    <div class="app-tag">Jämna lag · Alla behövs</div>
+    <div class="panel">
+      <label class="fld">Truppens namn (valfritt)</label>
+      <input id="wName" placeholder="t.ex. P12 IFK Handboll" autocomplete="off">
+      <label class="fld">PIN för nivåflik (4–6 siffror, valfritt)</label>
+      <input id="wPin" type="password" inputmode="numeric" maxlength="6" placeholder="Kan sättas senare" autocomplete="off">
+      <button class="primary block" id="wGo">Kom igång</button>
+      <div class="login-or">eller</div>
+      <label class="ghost block upload" style="text-align:center">⬆ Återställ från backup<input id="wImportFile" type="file" accept="application/json,.json" style="display:none"></label>
+    </div>
+    <p class="foot">All data lagras lokalt på den här enheten.<br>Nivåbedömningar visas aldrig i resultat, utskrifter eller exporter.</p>
+  </div>
+</div>
+
+<!-- ---------- Nav ---------- -->
+<nav>
+  <div class="brand">
+    <div class="brand-name">Team<b>builder</b></div>
+    <div class="brand-sub">Lagindelning</div>
+  </div>
+  <button class="navlink active" data-nav="vTrupp"><span class="ic" data-svg="users"></span>Trupp</button>
+  <button class="navlink" data-nav="vTraining"><span class="ic" data-svg="whistle"></span>Träning</button>
+  <button class="navlink" data-nav="vCup"><span class="ic" data-svg="trophy"></span>Cup</button>
+  <button class="navlink" data-nav="vHistory"><span class="ic" data-svg="clock"></span>Historik</button>
+  <button class="navlink" data-nav="vSettings"><span class="ic" data-svg="gear"></span>Inställningar</button>
+  <div class="spacer"></div>
+  <button class="navlink" id="navLock"><span class="ic" id="navLockIc"></span><span id="navLockLabel">Lås upp</span></button>
+  <button class="navlink" id="themeToggle"><span class="ic" id="themeIcon">☾</span><span id="themeLabel">Mörkt läge</span></button>
+  <div class="ctx" id="navCtx"></div>
+  <div class="app-version">Teambuilder v0.2</div>
+</nav>
+
+<main>
+
+  <!-- ---------- 1. Trupp ---------- -->
+  <div class="view" id="vTrupp">
+    <div class="head-row">
+      <div><h2><span class="h2-icon" data-svg="users"></span>Trupp</h2>
+        <p class="sub" id="truppSub">Spelarregister, relationer och nivåer.</p></div>
+      <div class="head-actions">
+        <button class="topbtn" id="pasteSquadBtn"><span data-svg="paste"></span> Klistra in trupp</button>
+        <button class="primary" id="addPlayerBtn">+ Lägg till spelare</button>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab sel" data-tab="players">Spelare</button>
+      <button class="tab" data-tab="relations">Relationer</button>
+      <button class="tab" data-tab="levels"><span data-svg="lockClosed"></span>Nivåer</button>
+      <div class="seg view-seg" id="truppViewSeg">
+        <button class="segbtn" data-view="grid" title="Kortvy" aria-label="Kortvy"><span data-svg="gridIc"></span></button>
+        <button class="segbtn" data-view="list" title="Listvy" aria-label="Listvy"><span data-svg="listIc"></span></button>
+      </div>
+    </div>
+    <div class="filterbar" id="truppFilter"></div>
+    <div class="filterbar" id="truppPosFilter"></div>
+    <div id="truppPlayers" class="grid"></div>
+    <div id="truppRelations" class="hidden">
+      <div class="set-section">
+        <h3>Ny relation</h3>
+        <select id="relA"></select>
+        <select id="relB"></select>
+        <div class="seg block" id="relTypeSeg">
+          <button class="segbtn sel" data-rel="good">Spelar bra ihop</button>
+          <button class="segbtn" data-rel="vary">Variera</button>
+          <button class="segbtn" data-rel="lock">Lås ihop</button>
+        </div>
+        <button class="primary block" id="relAdd">Lägg till relation</button>
+        <p class="hint">Spelar bra ihop = mjuk plusvikt · Variera = mjuk minusvikt (bryter klickar) · Lås ihop = hamnar alltid i samma lag.</p>
+      </div>
+      <div id="relList"></div>
+    </div>
+    <div id="truppLevels" class="hidden"></div>
+  </div>
+
+  <!-- ---------- 2. Träning ---------- -->
+  <div class="view" id="vTraining">
+    <div id="trainSetup">
+      <div class="head-row">
+        <div><h2><span class="h2-icon" data-svg="whistle"></span>Träning</h2>
+          <p class="sub">Bocka i vilka som är på plats och skapa dagens grupper.</p></div>
+        <div class="head-actions">
+          <button class="primary" id="openGroupSetup">Skapa träningsgrupper</button>
+        </div>
+      </div>
+      <label class="fld">Urval</label>
+      <div class="filterbar" id="serieSeg"></div>
+      <div class="att-head">
+        <div class="att-count" id="attCount"></div>
+        <div style="display:flex;gap:8px">
+          <button class="minibtn" id="attAll">Alla</button>
+          <button class="minibtn" id="attNone">Ingen</button>
+        </div>
+      </div>
+      <div class="tilegrid" id="attGrid"></div>
+    </div>
+    <div id="trainResult" class="hidden">
+      <div class="head-row">
+        <div><h2><span class="h2-icon" data-svg="whistle"></span>Träningsgrupper</h2>
+          <p class="sub" id="trainResultSub"></p></div>
+      </div>
+      <div class="result-bar">
+        <div class="left">
+          <button class="topbtn" id="trainBack">‹ Tillbaka</button>
+          <button class="topbtn acc" id="reshuffleBtn"><span data-svg="shuffle"></span> Slumpa om</button>
+        </div>
+        <div class="right">
+          <button class="topbtn" id="trainPrint"><span data-svg="print"></span> Skriv ut</button>
+          <button class="topbtn" id="balancePeek"><span data-svg="lockClosed"></span> Balans</button>
+          <span class="balance-inline hidden" id="balanceNote"></span>
+        </div>
+      </div>
+      <div class="teams-grid" id="trainTeams"></div>
+      <div class="templock-bar" id="templockBar"></div>
+      <p class="hint">Dra en spelare till en annan grupp för att justera. Långtryck på två spelare för att låsa ihop dem inför nästa omslumpning.</p>
+    </div>
+  </div>
+
+  <!-- ---------- 3. Cup ---------- -->
+  <div class="view" id="vCup">
+    <div id="cupList">
+      <div class="head-row">
+        <div><h2><span class="h2-icon" data-svg="trophy"></span>Cup</h2>
+          <p class="sub">Event med lag som består över hela dagen eller helgen.</p></div>
+        <div class="head-actions"><button class="primary" id="addCupBtn">+ Nytt event</button></div>
+      </div>
+      <div class="grid" id="cupGrid"></div>
+    </div>
+    <div id="cupDetail" class="hidden"></div>
+  </div>
+
+  <!-- ---------- 4. Historik ---------- -->
+  <div class="view" id="vHistory">
+    <div class="head-row">
+      <div><h2><span class="h2-icon" data-svg="clock"></span>Historik</h2>
+        <p class="sub">Tidigare indelningar. Underlag för ”Variera mot förra gången”.</p></div>
+    </div>
+    <div id="histList"></div>
+  </div>
+
+  <!-- ---------- 5. Inställningar ---------- -->
+  <div class="view" id="vSettings">
+    <div class="head-row">
+      <div><h2><span class="h2-icon" data-svg="gear"></span>Inställningar</h2>
+        <p class="sub">PIN, backup och standardregler.</p></div>
+    </div>
+
+    <div class="set-section">
+      <h3>Trupp</h3>
+      <div class="set-row">
+        <div><div class="lbl">Truppens namn</div></div>
+        <input id="setSquadName" placeholder="t.ex. P12" style="max-width:200px">
+      </div>
+      <div class="set-row">
+        <div><div class="lbl">Positionsläge</div>
+          <div class="hint2">Förenklat läge: MV / Bak / Mitt / Kant. Befintliga spelare behåller sin position tills du ändrar den.</div></div>
+        <select id="setPosMode">
+          <option value="full">Fullt</option>
+          <option value="simple">Förenklat</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="set-section">
+      <h3>PIN &amp; nivåer</h3>
+      <div class="set-row">
+        <div><div class="lbl">PIN-skydd</div>
+          <div class="hint2">Skyddar nivåfliken, graderingen i spelardialogen och balansindikatorn. Graderingar visas aldrig i resultat, utskrifter eller exporter.</div></div>
+        <button class="topbtn" id="setPinBtn">Sätt PIN</button>
+      </div>
+      <div class="set-row">
+        <div><div class="lbl">Påminnelse om nivåuppdatering</div>
+          <div class="hint2">Markerar nivåer som inte uppdaterats på länge.</div></div>
+        <select id="setStale">
+          <option value="1">1 månad</option>
+          <option value="2">2 månader</option>
+          <option value="3">3 månader</option>
+          <option value="6">6 månader</option>
+          <option value="12">12 månader</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="set-section">
+      <h3>Standardregler</h3>
+      <p class="hint" style="margin:0 0 8px">Förvalda parametrar vid ny indelning. Träningsvyn minns dessutom senaste läget.</p>
+      <div id="defaultSwitches"></div>
+    </div>
+
+    <div class="set-section">
+      <h3>Backup &amp; delning</h3>
+      <div class="set-row">
+        <div><div class="lbl">Full backup</div>
+          <div class="hint2">All data inklusive nivåer och anteckningar. Spara på säker plats.</div></div>
+        <button class="topbtn acc" id="exportFullBtn"><span data-svg="download"></span> Exportera</button>
+      </div>
+      <div class="set-row">
+        <div><div class="lbl">Dela trupp</div>
+          <div class="hint2">Endast namn, positioner och hänthet – utan nivåsiffror och anteckningar.</div></div>
+        <button class="topbtn" id="exportShareBtn"><span data-svg="download"></span> Exportera</button>
+      </div>
+      <div class="set-row">
+        <div><div class="lbl">Importera</div>
+          <div class="hint2">JSON-backup eller delad trupp. Välj ersätt eller slå ihop vid import.</div></div>
+        <label class="topbtn upload"><span data-svg="upload"></span> Välj fil<input id="importFile" type="file" accept="application/json,.json" style="display:none"></label>
+      </div>
+    </div>
+
+    <div class="set-section">
+      <h3>App</h3>
+      <div class="set-row">
+        <div><div class="lbl">Nollställ allt</div>
+          <div class="hint2">Raderar all data på den här enheten. Kan inte ångras.</div></div>
+        <button class="topbtn danger" id="resetAllBtn"><span data-svg="trash"></span> Nollställ</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div id="modalHost"></div>
+<div id="printArea"></div>
+
