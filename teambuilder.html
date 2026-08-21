@@ -1707,24 +1707,34 @@ $('setPinBtn').onclick=()=>{
 };
 
 /* ---------- Export / import ---------- */
-function downloadJson(obj,filename){
-  const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});
+// Sparar via värdmiljöns filhantering när appen körs som förhandsvisning,
+// annars som vanlig nedladdning (lokal fil, GitHub Pages).
+async function downloadJson(obj,filename,okMsg){
+  const text=JSON.stringify(obj,null,2);
+  let host=null;
+  try{ if(window.claude&&typeof window.claude.use==='function') host=await window.claude.use('downloads'); }
+  catch(e){ host=null; }
+  if(host){
+    try{ await host.save({filename,data:text}); toast(okMsg); }
+    catch(err){ if(!err||err.code!=='declined') toast('Kunde inte spara filen'); }
+    return;
+  }
+  const blob=new Blob([text],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob); a.download=filename;
   document.body.appendChild(a); a.click();
   setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },400);
+  toast(okMsg);
 }
 function today(){ return new Date().toISOString().slice(0,10); }
 $('exportFullBtn').onclick=()=>{
   downloadJson(Object.assign({exportType:'teambuilder-full',exportedAt:Date.now()},root),
-    'teambuilder-backup-'+today()+'.json');
-  toast('Full backup exporterad');
+    'teambuilder-backup-'+today()+'.json','Full backup exporterad');
 };
 $('exportShareBtn').onclick=()=>{
   downloadJson({exportType:'teambuilder-share',exportedAt:Date.now(),squadName:root.squadName,
     players:root.players.map(p=>({name:p.name,pos:p.pos,pos2:p.pos2,hand:p.hand,color:p.color,active:p.active}))},
-    'teambuilder-trupp-'+today()+'.json');
-  toast('Trupp exporterad – utan nivåer och anteckningar');
+    'teambuilder-trupp-'+today()+'.json','Trupp exporterad – utan nivåer och anteckningar');
 };
 $('importFile').onchange=e=>{
   const f=e.target.files[0]; e.target.value='';
