@@ -152,7 +152,7 @@ function freshRoot(){
     history:[],      // {id,ts,type,label,teams:[{name,vestId,players:[{id,name}]}]}
     cups:[],         // {id,name,date,numTeams,params,presentIds,teams}
     settings:{ pinHash:null, posMode:'full', staleMonths:3, theme:'dark',
-      truppView:'grid', truppFilter:[], truppPos:[],
+      truppView:'grid', truppFilter:[], truppPos:[], pitchColor:'bla',
       defaults:Object.assign({},DEFAULT_PARAMS), lastTraining:null }
   };
 }
@@ -536,15 +536,38 @@ function renderTrupp(){
   else if(truppTab==='pitch') renderPitch();
   else renderLevels();
 }
-/* ---------- Positionsöversikt: halv plan med antal per position ---------- */
-// Koordinater i SVG:ns viewBox (0 0 400 360). Mål uppe i mitten, 6- och
-// 9-meterslinjen bågar nedåt – tränartavlans vy. Raderna ligger med god
-// marginal från varandra så cirklarna aldrig krockar.
+/* ---------- Positionsöversikt: tränartavla med tröjor ---------- */
+// Riktiga mått (IHF/SHF): planen är 40x20 m, så en halvplan är kvadratisk.
+// Vi beskär på 12,5 m djup i stället för att platta till den – alla positioner
+// ligger inom nio meter från mållinjen. 6- och 9-meterslinjen är kvartscirklar
+// från vardera målstolpe med en rak bit på 3 m emellan (målets bredd).
+const PITCH={M:19,PAD:10,WIDTH:20,DEPTH:11.5,LP:8.5,RP:11.5};
+const JERSEY_PATH='M11 3 L3 9 L1 15 L8 19 L11 16 L11 41 L29 41 L29 16 L32 19 L39 15 L37 9 L29 3 C26 9 14 9 11 3 Z';
+// Sexorna står ytterst, niorna mer centralt. Meter från vänster sidlinje/mållinje.
 const PITCH_SPOTS={
-  full:[['MV',200,72],['V6',108,155],['M6',200,155],['H6',292,155],
-        ['V9',92,262],['M9',200,262],['H9',308,262]],
-  simple:[['MV',200,72],['KANT',86,168],['MITT',200,155],['KANT2',314,168],['BAK',200,262]]
+  full:[['MV',10,1.6],['V6',3.6,3.4],['M6',10,6.0],['H6',16.4,3.4],
+        ['V9',5.6,8.6],['M9',10,9.4],['H9',14.4,8.6]],
+  simple:[['MV',10,1.6],['KANT',3.6,3.4],['MITT',10,6.0],['KANT',16.4,3.4],['BAK',10,9.4]]
 };
+// Färgväljaren återanvänder västpaletten, så tröjfärg och västfärg är samma sak.
+const PITCH_COLORS=['vit','vinrod','gul','gron','bla'];
+function pitchColor(){
+  const id=S().pitchColor;
+  return vestById(PITCH_COLORS.indexOf(id)>=0?id:'bla');
+}
+function pitchPx(m){ return PITCH.PAD+m*PITCH.M; }
+// Målområdeslinje på radie r: bågen bugar bort från stolpen och möter
+// mållinjen, eller sidlinjen när radien är bredare än avståndet dit.
+function pitchAreaLine(r,cls){
+  const {LP,RP,WIDTH,M}=PITCH;
+  const s=LP-r>=0?[LP-r,0]:[0,Math.sqrt(r*r-LP*LP)];
+  const e=RP+r<=WIDTH?[RP+r,0]:[WIDTH,Math.sqrt(r*r-(WIDTH-RP)*(WIDTH-RP))];
+  const rp=(r*M).toFixed(1);
+  return '<path class="'+cls+'" d="M '+pitchPx(s[0]).toFixed(1)+' '+pitchPx(s[1]).toFixed(1)+
+    ' A '+rp+' '+rp+' 0 0 0 '+pitchPx(LP).toFixed(1)+' '+pitchPx(r).toFixed(1)+
+    ' L '+pitchPx(RP).toFixed(1)+' '+pitchPx(r).toFixed(1)+
+    ' A '+rp+' '+rp+' 0 0 0 '+pitchPx(e[0]).toFixed(1)+' '+pitchPx(e[1]).toFixed(1)+'"/>';
+}
 function renderPitch(){
   const box=$('truppPitch');
   const sel=normSel(S().truppFilter);
@@ -555,37 +578,39 @@ function renderPitch(){
       :'Inga spelare ännu. Tryck ”+ Lägg till spelare”.')+'</div>';
     return;
   }
-  // Räkna primär position; sekundär räknas separat så den inte blåser upp siffran.
-  const prim={}, sec={};
-  pool.forEach(p=>{ if(p.pos) prim[p.pos]=(prim[p.pos]||0)+1;
-                    if(p.pos2) sec[p.pos2]=(sec[p.pos2]||0)+1; });
+  const count={};
+  pool.forEach(p=>{ if(p.pos) count[p.pos]=(count[p.pos]||0)+1; });
   const noPos=pool.filter(p=>!p.pos).length;
-  const simple=S().posMode==='simple';
-  const spots=PITCH_SPOTS[simple?'simple':'full'];
+  const spots=PITCH_SPOTS[S().posMode==='simple'?'simple':'full'];
+  const col=pitchColor(), sc=0.84;
 
-  const marks=spots.map(([codeRaw,x,y])=>{
-    const code=codeRaw==='KANT2'?'KANT':codeRaw;   // två kantrutor, samma kod
-    const n=prim[code]||0, s=sec[code]||0;
-    const cls='pspot'+(n?'':' empty')+(code==='MV'?' gk':'');
-    return '<g class="'+cls+'" data-pos="'+code+'" tabindex="0" role="button">'+
-      '<circle cx="'+x+'" cy="'+y+'" r="26"/>'+
-      '<text class="ps-n" x="'+x+'" y="'+(y+2)+'">'+n+'</text>'+
-      '<text class="ps-c" x="'+x+'" y="'+(y+44)+'">'+esc(code)+'</text>'+
-      (s?'<text class="ps-s" x="'+x+'" y="'+(y-32)+'">+'+s+'</text>':'')+
-      '</g>';
+  const shirts=spots.map(([code,mx,my])=>{
+    const n=count[code]||0;
+    const x=pitchPx(mx), y=pitchPx(my);
+    const fill=n?col.bg:'var(--panel-2)';
+    const ink=n?col.ink:'var(--ink-faint)';
+    return '<g class="pshirt'+(n?'':' empty')+'" data-pos="'+code+'" tabindex="0" role="button" '+
+      'aria-label="'+esc(code)+': '+n+' spelare">'+
+      '<g transform="translate('+(x-20*sc).toFixed(1)+','+(y-22*sc).toFixed(1)+') scale('+sc+')">'+
+      '<path class="jb" style="fill:'+fill+'" d="'+JERSEY_PATH+'"/>'+
+      '<text class="jn" style="fill:'+ink+'" x="20" y="26">'+n+'</text></g>'+
+      '<text class="jl" x="'+x.toFixed(0)+'" y="'+(y+22*sc+14).toFixed(0)+'">'+esc(code)+'</text></g>';
   }).join('');
 
-  box.innerHTML='<div class="pitchwrap"><svg viewBox="0 0 400 336" class="pitch" '+
+  const vb=(PITCH.WIDTH*PITCH.M+2*PITCH.PAD).toFixed(0)+' '+(PITCH.DEPTH*PITCH.M+2*PITCH.PAD).toFixed(0);
+  box.innerHTML='<div class="pitchwrap"><svg viewBox="0 0 '+vb+'" class="pitch" '+
     'role="img" aria-label="Antal spelare per position">'+
-    '<rect class="pf" x="8" y="8" width="384" height="320" rx="3"/>'+
-    '<path class="pl" d="M8 26 H392"/>'+                       // mållinje
-    '<rect class="pgoal" x="166" y="17" width="68" height="9"/>'+
-    '<path class="pl6" d="M48 26 Q200 364 352 26"/>'+          // 6-meterslinje
-    '<path class="pl9" d="M14 26 Q200 584 386 26"/>'+          // 9-meter, streckad
-    marks+'</svg></div>'+
+    '<rect class="pf" x="'+PITCH.PAD+'" y="'+PITCH.PAD+'" width="'+(PITCH.WIDTH*PITCH.M).toFixed(0)+
+      '" height="'+(PITCH.DEPTH*PITCH.M).toFixed(0)+'" rx="2"/>'+
+    pitchAreaLine(6,'pl6')+pitchAreaLine(9,'pl9')+
+    shirts+'</svg></div>'+
     '<div class="pitchlegend">'+
       '<span class="pl-item"><b>'+pool.length+'</b> spelare i urvalet</span>'+
-      '<span class="pl-item"><span class="pl-dot sec"></span>+n = sekundär position</span>'+
+      '<span class="pl-item pl-colors">'+PITCH_COLORS.map(id=>{
+        const v=vestById(id);
+        return '<button class="swatch'+(v.id===col.id?' sel':'')+'" data-col="'+v.id+
+          '" title="'+esc(v.name)+'" aria-label="'+esc(v.name)+'" style="background:'+v.bg+'"></button>';
+      }).join('')+'</span>'+
       (noPos?'<button class="fchip" id="pitchNoPos">Utan position<span class="n">'+noPos+'</span></button>':'')+
     '</div>'+
     '<p class="hint">Tryck på en position för att se spelarna i truppen.</p>';
@@ -595,6 +620,9 @@ function renderPitch(){
     const go=()=>{ S().truppPos=[g.dataset.pos]; save(); truppTab='players'; renderTrupp(); };
     g.onclick=go;
     g.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } };
+  });
+  box.querySelectorAll('[data-col]').forEach(b=>b.onclick=()=>{
+    S().pitchColor=b.dataset.col; save(); renderPitch();
   });
   const np=box.querySelector('#pitchNoPos');
   if(np) np.onclick=()=>{ S().truppPos=['none']; save(); truppTab='players'; renderTrupp(); };
