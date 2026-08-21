@@ -532,12 +532,7 @@
       <div class="setup-grid">
         <div>
           <label class="fld">Urval</label>
-          <div class="seg block" id="serieSeg">
-            <button class="segbtn sel" data-s="even">Jämna</button>
-            <button class="segbtn" data-s="1">Nivå 1</button>
-            <button class="segbtn" data-s="2">Nivå 2</button>
-            <button class="segbtn" data-s="3">Nivå 3</button>
-          </div>
+          <div class="filterbar" id="serieSeg"></div>
           <div class="att-head">
             <div class="att-count" id="attCount"></div>
             <div style="display:flex;gap:8px">
@@ -750,6 +745,36 @@ const DEFAULT_PARAMS={balance:true,gk:true,pos:true,rel:true,left:false,vary:fal
 // Serienivå: vilken nivå i seriesystemet spelaren tillhör. Neutral fakta,
 // inte en bedömning – visas öppet och följer med i truppdelning.
 const SERIES=[1,2,3];
+// Urval av serienivåer. Flera kan vara valda samtidigt (t.ex. [2,3]);
+// tom lista = hela truppen. 'none' = spelare utan satt serienivå.
+function normSel(v){
+  if(Array.isArray(v)) return v.filter(x=>SERIES.includes(x)||x==='none');
+  if(v==null||v==='all'||v==='even') return [];
+  if(v==='none') return ['none'];
+  return SERIES.includes(v)?[v]:[];
+}
+function inSel(p,sel){
+  const s=normSel(sel);
+  if(!s.length) return true;
+  return p.serie?s.includes(p.serie):s.includes('none');
+}
+function toggleSel(sel,val){
+  const s=normSel(sel);
+  if(val==='all') return [];
+  const i=s.indexOf(val);
+  if(i>=0){ s.splice(i,1); return s; }
+  s.push(val);
+  return s.sort((a,b)=>(a==='none')-(b==='none')||a-b);
+}
+function serieLabel(sel){
+  const s=normSel(sel);
+  if(!s.length) return 'Jämna';
+  const tiers=s.filter(x=>x!=='none');
+  const parts=[];
+  if(tiers.length) parts.push('Nivå '+tiers.join('+'));
+  if(s.includes('none')) parts.push(tiers.length?'utan nivå':'Utan nivå');
+  return parts.join(' + ');
+}
 // Gradering: en enda dold siffra 1–10. Osatt gradering räknas som mitten.
 const LEVELS=[1,2,3,4,5,6,7,8,9,10];
 const LEVEL_MID=5.5;
@@ -803,7 +828,7 @@ function freshRoot(){
     history:[],      // {id,ts,type,label,teams:[{name,vestId,players:[{id,name}]}]}
     cups:[],         // {id,name,date,numTeams,params,presentIds,teams}
     settings:{ pinHash:null, posMode:'full', staleMonths:3, theme:'dark',
-      truppView:'grid', truppFilter:'all',
+      truppView:'grid', truppFilter:[],
       defaults:Object.assign({},DEFAULT_PARAMS), lastTraining:null }
   };
 }
@@ -818,6 +843,12 @@ function normalizeRoot(d){
   if((d.version||1)<2){
     d.players.forEach(p=>{ if(typeof p.level==='number') p.level=Math.min(10,Math.max(1,p.level*2)); });
   }
+  // Urval sparades tidigare som ett enda värde ('even'/1/2/3) – normalisera
+  // till listform så flera nivåer kan väljas samtidigt.
+  d.settings.truppFilter=normSel(d.settings.truppFilter);
+  if(d.settings.lastTraining) d.settings.lastTraining.serie=normSel(d.settings.lastTraining.serie);
+  d.cups.forEach(c=>{ c.serie=normSel(c.serie); });
+  d.history.forEach(h=>{ if('serie' in h) h.serie=normSel(h.serie); });
   d.version=DATA_VERSION;
   return d;
 }
@@ -1122,11 +1153,11 @@ function renderTrupp(){
   $('truppRelations').classList.toggle('hidden',truppTab!=='relations');
   $('truppLevels').classList.toggle('hidden',truppTab!=='levels');
   const act=root.players.filter(p=>p.active).length;
-  const f=S().truppFilter||'all';
+  const sel=normSel(S().truppFilter);
   if(!root.players.length) $('truppSub').textContent='Spelarregister, relationer och nivåer.';
-  else if(truppTab==='players'&&f!=='all'){
-    const shown=root.players.filter(p=>matchesFilter(p,f)).length;
-    $('truppSub').textContent='Visar '+(f==='none'?'spelare utan serienivå':'nivå '+f)+
+  else if(truppTab==='players'&&sel.length){
+    const shown=root.players.filter(p=>inSel(p,sel)).length;
+    $('truppSub').textContent='Visar '+serieLabel(sel).toLowerCase()+
       ' · '+shown+' av '+root.players.length+' i truppen';
   }
   else $('truppSub').textContent=act+' aktiva spelare'+(root.players.length-act?' · '+(root.players.length-act)+' inaktiva':'');
@@ -1141,24 +1172,25 @@ function playerAvatar(p,cls){
 document.querySelectorAll('#truppViewSeg .segbtn').forEach(b=>b.onclick=()=>{
   S().truppView=b.dataset.view; save(); renderPlayers();
 });
-// Visningsfilter på serienivå. 'all' = hela truppen, 'none' = de utan nivå.
-function matchesFilter(p,f){
-  if(f==='all'||!f) return true;
-  if(f==='none') return !p.serie;
-  return p.serie===f;
+// Filterknappar för serienivå. Flera nivåer kan vara markerade samtidigt;
+// "Alla" nollställer urvalet.
+function selChipRow(sel,counts){
+  const s=normSel(sel);
+  const opts=[['all','Alla']].concat(SERIES.map(n=>[n,'Nivå '+n]),[['none','Utan nivå']]);
+  return opts.map(([val,label])=>{
+    const on=val==='all'?!s.length:s.includes(val);
+    const n=counts?counts(val):null;
+    return '<button class="fchip'+(on?' sel':'')+'" data-f="'+val+'">'+esc(label)+
+      (n===null?'':'<span class="n">'+n+'</span>')+'</button>';
+  }).join('');
 }
 function renderTruppFilter(){
-  const all=root.players;
-  const opts=[['all','Alla']].concat(SERIES.map(n=>[n,'Nivå '+n]),[['none','Utan nivå']]);
-  const f=S().truppFilter||'all';
-  $('truppFilter').innerHTML=opts.map(([val,label])=>{
-    const n=all.filter(p=>matchesFilter(p,val)).length;
-    return '<button class="fchip'+(val===f?' sel':'')+'" data-f="'+val+'">'+esc(label)+
-      '<span class="n">'+n+'</span></button>';
-  }).join('');
+  const sel=S().truppFilter;
+  $('truppFilter').innerHTML=selChipRow(sel,val=>
+    root.players.filter(p=>inSel(p,val==='all'?[]:[val])).length);
   $('truppFilter').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{
     const v=b.dataset.f;
-    S().truppFilter=(v==='all'||v==='none')?v:parseInt(v,10);
+    S().truppFilter=toggleSel(S().truppFilter,v==='all'?'all':(v==='none'?'none':parseInt(v,10)));
     save(); renderTrupp();
   });
 }
@@ -1169,12 +1201,13 @@ function renderPlayers(){
   document.querySelectorAll('#truppViewSeg .segbtn').forEach(b=>
     b.classList.toggle('sel',b.dataset.view===(listMode?'list':'grid')));
   renderTruppFilter();
-  const f=S().truppFilter||'all';
-  const ps=root.players.filter(p=>matchesFilter(p,f))
+  const sel=normSel(S().truppFilter);
+  const ps=root.players.filter(p=>inSel(p,sel))
     .sort((a,b)=>(b.active-a.active)||a.name.localeCompare(b.name,'sv'));
   if(!ps.length){
     g.innerHTML='<div class="empty">'+(root.players.length
-      ?(f==='none'?'Alla spelare har en serienivå.':'Ingen spelare på nivå '+f+'. Sätt serienivå i spelarens kort.')
+      ?(sel.length===1&&sel[0]==='none'?'Alla spelare har en serienivå.'
+        :'Ingen spelare i urvalet '+serieLabel(sel)+'. Sätt serienivå i spelarens kort.')
       :'Inga spelare ännu. Tryck ”+ Lägg till spelare”.')+'</div>';
     return;
   }
@@ -1304,7 +1337,7 @@ function openPlayerEditor(pid){
       const np=Object.assign({id:uid(),level,levelUpdated:level==null?null:Date.now()},data);
       root.players.push(np);
       // Ett aktivt filter får inte gömma spelaren som just lades till.
-      if(!matchesFilter(np,S().truppFilter||'all')) S().truppFilter='all';
+      if(!inSel(np,S().truppFilter)) S().truppFilter=[];
     }
     save(); closeModal(); renderTrupp();
   };
@@ -1392,16 +1425,15 @@ function renderLevels(){
    2. TRÄNING
    ===================================================================== */
 const training={
-  phase:'setup', present:new Set(), serie:'even', countMode:'2', customCount:5, teamSize:6,
+  phase:'setup', present:new Set(), serie:[], countMode:'2', customCount:5, teamSize:6,
   params:null, result:null, historyId:null, tempLocks:[], lockSel:null, showBalance:false
 };
-// Urvalet avgör vilka spelare som alls är valbara: 'even' = hela truppen,
-// 1/2/3 = bara spelarna i den serienivån.
-function eligiblePlayers(serie){
-  const ps=root.players.filter(p=>p.active).sort((a,b)=>a.name.localeCompare(b.name,'sv'));
-  return (serie==='even'||!serie)?ps:ps.filter(p=>p.serie===serie);
+// Urvalet avgör vilka spelare som alls är valbara: tomt = hela truppen,
+// annars bara spelarna i de valda serienivåerna.
+function eligiblePlayers(sel){
+  return root.players.filter(p=>p.active&&inSel(p,sel))
+    .sort((a,b)=>a.name.localeCompare(b.name,'sv'));
 }
-function serieLabel(serie){ return (serie==='even'||!serie)?'Jämna':'Nivå '+serie; }
 // Närvarande spelare inom urvalet – det algoritmen faktiskt delar in.
 function presentEligibleIds(){
   return eligiblePlayers(training.serie).filter(p=>training.present.has(p.id)).map(p=>p.id);
@@ -1411,7 +1443,7 @@ function trainingParams(){
     const last=S().lastTraining;
     training.params=Object.assign({},S().defaults,(last&&last.params)||{});
     if(last){ training.countMode=last.countMode||'2'; training.customCount=last.customCount||5;
-      training.teamSize=last.teamSize||6; training.serie=last.serie||'even'; }
+      training.teamSize=last.teamSize||6; training.serie=normSel(last.serie); }
   }
   return training.params;
 }
@@ -1432,17 +1464,19 @@ function renderTrainSetup(){
   const all=root.players.filter(p=>p.active);
   // rensa närvaro för borttagna spelare
   [...training.present].forEach(id=>{ if(!all.some(p=>p.id===id)) training.present.delete(id); });
-  // urval
-  document.querySelectorAll('#serieSeg .segbtn').forEach(b=>{
-    const val=b.dataset.s==='even'?'even':parseInt(b.dataset.s,10);
-    b.classList.toggle('sel',val===training.serie);
-    b.onclick=()=>{ training.serie=val; renderTrainSetup(); };
+  // urval – flera nivåer kan kombineras
+  $('serieSeg').innerHTML=selChipRow(training.serie,val=>
+    root.players.filter(p=>p.active&&inSel(p,val==='all'?[]:[val])).length);
+  $('serieSeg').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{
+    const v=b.dataset.f;
+    training.serie=toggleSel(training.serie,v==='all'?'all':(v==='none'?'none':parseInt(v,10)));
+    renderTrainSetup();
   });
   const ps=eligiblePlayers(training.serie);
   $('attCount').innerHTML='<b>'+presentEligibleIds().length+'</b> / '+ps.length+' på plats';
   const g=$('attGrid');
   if(!all.length) g.innerHTML='<div class="empty">Lägg till spelare i Truppen först.</div>';
-  else if(!ps.length) g.innerHTML='<div class="empty">Ingen spelare är satt till nivå '+training.serie+
+  else if(!ps.length) g.innerHTML='<div class="empty">Ingen spelare i urvalet '+serieLabel(training.serie)+
     '. Sätt serienivå på spelarna i Truppen.</div>';
   else g.innerHTML=ps.map(p=>'<button class="tile'+(training.present.has(p.id)?' on':'')+'" data-pid="'+p.id+'">'+
     '<span class="dot" style="background:'+esc(p.color||'#98989f')+'"></span>'+
@@ -1491,7 +1525,7 @@ $('divideBtn').onclick=()=>{
   if(n<2||n<T) return;
   const P=trainingParams();
   S().lastTraining={params:Object.assign({},P),countMode:training.countMode,customCount:training.customCount,
-    teamSize:training.teamSize,serie:training.serie};
+    teamSize:training.teamSize,serie:normSel(training.serie)};
   training.tempLocks=[]; training.lockSel=null; training.showBalance=false;
   runTrainingDivision(true);
   training.phase='result';
@@ -1515,7 +1549,7 @@ function runTrainingDivision(fresh){
 function saveTrainingHistory(){
   const r=training.result; if(!r) return;
   const entry={
-    id:training.historyId||uid(), ts:Date.now(), type:'Träning', serie:training.serie,
+    id:training.historyId||uid(), ts:Date.now(), type:'Träning', serie:normSel(training.serie),
     label:r.teams.length+' lag · '+r.teams.reduce((s,t)=>s+t.playerIds.length,0)+' spelare',
     teams:r.teams.map(t=>({name:t.name,vestId:t.vestId,
       players:t.playerIds.map(id=>{ const p=pById(id); return {id,name:p?p.name:'?'}; })}))
@@ -1682,7 +1716,7 @@ let openCupId=null;
 // Uttagna till eventet, begränsat till eventets urval.
 function cupEligibleIds(cup){
   const ids=new Set(cup.presentIds||[]);
-  return eligiblePlayers(cup.serie||'even').filter(p=>ids.has(p.id)).map(p=>p.id);
+  return eligiblePlayers(cup.serie).filter(p=>ids.has(p.id)).map(p=>p.id);
 }
 function renderCup(){
   const cup=openCupId?root.cups.find(c=>c.id===openCupId):null;
@@ -1709,7 +1743,7 @@ $('addCupBtn').onclick=()=>{
   w.querySelector('#cuOk').onclick=()=>{
     const name=w.querySelector('#cuName').value.trim();
     if(!name){ toast('Ange ett namn'); return; }
-    const cup={id:uid(),name,date:w.querySelector('#cuDate').value,numTeams:2,serie:'even',
+    const cup={id:uid(),name,date:w.querySelector('#cuDate').value,numTeams:2,serie:[],
       params:{balance:true,gk:true,pos:true,rel:true,left:false,vary:false},
       presentIds:[],teams:null,lockSel:null};
     root.cups.unshift(cup); save(); closeModal();
@@ -1719,12 +1753,12 @@ $('addCupBtn').onclick=()=>{
 function renderCupDetail(cup){
   const box=$('cupDetail');
   let html='<div class="head-row"><div><h2><span class="h2-icon" data-svg="trophy"></span>'+esc(cup.name)+'</h2>'+
-    '<p class="sub">'+esc(cup.date||'')+(cup.serie&&cup.serie!=='even'?' · Nivå '+esc(cup.serie):'')+
+    '<p class="sub">'+esc(cup.date||'')+(normSel(cup.serie).length?' · '+esc(serieLabel(cup.serie)):'')+
     (cup.teams?' · Lagen består över hela eventet':'')+'</p></div>'+
     '<div class="head-actions"><button class="topbtn" id="cupBack">‹ Alla event</button>'+
     '<button class="topbtn danger" id="cupDelete"><span data-svg="trash"></span> Ta bort</button></div></div>';
   if(!cup.teams){
-    const serie=cup.serie||'even';
+    const serie=normSel(cup.serie);
     const all=root.players.filter(p=>p.active);
     const ps=eligiblePlayers(serie);
     cup.presentIds=(cup.presentIds||[]).filter(id=>all.some(p=>p.id===id));
@@ -1733,16 +1767,15 @@ function renderCupDetail(cup){
     const base=Math.floor(n/Math.max(1,T)), extra=n%Math.max(1,T);
     const sizeInfo=n>=T?(extra?('lag om '+(base+1)+' och '+base+' spelare'):('exakt lagstorlek: '+base)):'för få spelare';
     html+='<div class="setup-grid"><div>'+
-      '<label class="fld">Urval</label><div class="seg block" id="cupSerieSeg">'+
-        '<button class="segbtn'+(serie==='even'?' sel':'')+'" data-s="even">Jämna</button>'+
-        SERIES.map(x=>'<button class="segbtn'+(serie===x?' sel':'')+'" data-s="'+x+'">Nivå '+x+'</button>').join('')+
+      '<label class="fld">Urval</label><div class="filterbar" id="cupSerieSeg">'+
+        selChipRow(serie,val=>root.players.filter(p=>p.active&&inSel(p,val==='all'?[]:[val])).length)+
       '</div>'+
       '<div class="att-head"><div class="att-count"><b>'+n+'</b> / '+ps.length+' med på eventet</div>'+
       '<div style="display:flex;gap:8px"><button class="minibtn" id="cupAll">Alla</button><button class="minibtn" id="cupNone">Ingen</button></div></div>'+
       '<div class="tilegrid" id="cupAttGrid">'+(ps.length?ps.map(p=>'<button class="tile'+(cup.presentIds.includes(p.id)?' on':'')+'" data-pid="'+p.id+'">'+
         '<span class="dot" style="background:'+esc(p.color||'#98989f')+'"></span><span class="nm">'+esc(p.name)+'</span>'+
         (p.pos?'<span class="pos">'+esc(p.pos)+'</span>':'')+'</button>').join('')
-        :'<div class="empty">Ingen spelare är satt till nivå '+serie+'. Sätt serienivå på spelarna i Truppen.</div>')+'</div></div>'+
+        :'<div class="empty">Ingen spelare i urvalet '+serieLabel(serie)+'. Sätt serienivå på spelarna i Truppen.</div>')+'</div></div>'+
       '<div class="card"><h3>Antal lag</h3>'+
       '<input id="cupTeamsN" type="number" inputmode="numeric" min="2" max="8" value="'+T+'">'+
       '<p class="hint" style="margin:0 0 12px">'+n+' spelare → '+esc(sizeInfo)+'</p>'+
@@ -1768,18 +1801,19 @@ function renderCupDetail(cup){
       if(i>=0) cup.presentIds.splice(i,1); else cup.presentIds.push(id);
       save(); renderCupDetail(cup);
     });
-    box.querySelectorAll('#cupSerieSeg .segbtn').forEach(b=>b.onclick=()=>{
-      cup.serie=b.dataset.s==='even'?'even':parseInt(b.dataset.s,10);
+    box.querySelectorAll('#cupSerieSeg [data-f]').forEach(b=>b.onclick=()=>{
+      const v=b.dataset.f;
+      cup.serie=toggleSel(cup.serie,v==='all'?'all':(v==='none'?'none':parseInt(v,10)));
       save(); renderCupDetail(cup);
     });
     // "Alla"/"Ingen" gäller det aktuella urvalet, inte hela truppen.
     $('cupAll').onclick=()=>{
-      const add=eligiblePlayers(cup.serie||'even').map(p=>p.id);
+      const add=eligiblePlayers(cup.serie).map(p=>p.id);
       cup.presentIds=[...new Set(cup.presentIds.concat(add))];
       save(); renderCupDetail(cup);
     };
     $('cupNone').onclick=()=>{
-      const drop=new Set(eligiblePlayers(cup.serie||'even').map(p=>p.id));
+      const drop=new Set(eligiblePlayers(cup.serie).map(p=>p.id));
       cup.presentIds=cup.presentIds.filter(id=>!drop.has(id));
       save(); renderCupDetail(cup);
     };
@@ -1834,7 +1868,7 @@ function renderHistory(){
   L.innerHTML=root.history.map(h=>'<details class="card histcard" style="margin-bottom:10px">'+
     '<summary><span class="hist-date">'+fmtDateShort(h.ts)+'</span>'+
     '<div class="hist-meta"><div class="hist-title">'+esc(h.type)+
-    (h.type==='Cup'?' · '+esc(h.label):(h.serie&&h.serie!=='even'?' · Nivå '+esc(h.serie):''))+'</div>'+
+    (h.type==='Cup'?' · '+esc(h.label):(normSel(h.serie).length?' · '+esc(serieLabel(h.serie)):''))+'</div>'+
     '<div class="hist-sub">'+fmtDate(h.ts)+' · '+h.teams.length+' lag · '+h.teams.reduce((s,t)=>s+t.players.length,0)+' spelare</div></div>'+
     '<button class="cardDel" data-hid="'+h.id+'">✕</button></summary>'+
     '<div class="hist-body">'+h.teams.map(t=>{
