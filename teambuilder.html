@@ -240,6 +240,17 @@
   .postag.mv { background: rgba(48,209,88,0.16); color: var(--save); }
   .postag.hand { background: rgba(255,159,10,0.16); color: var(--accent-2); }
 
+  /* ---------- Spelarlista (listvy i truppen) ---------- */
+  .plist { display: flex; flex-direction: column; gap: 8px; }
+  .plistrow { display: flex; align-items: center; gap: 13px; padding: 11px 16px; }
+  .plistrow .pname { font-size: 15px; font-weight: 700; flex: 0 1 220px; min-width: 110px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .plistrow .pmeta { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; min-width: 0; }
+  .plistrow.inactive { opacity: 0.45; }
+  .tabs .view-seg { margin-left: auto; }
+  .view-seg .segbtn { padding: 9px 13px; display: inline-flex; align-items: center; }
+  .view-seg .segbtn svg { width: 16px; height: 16px; display: block; }
+
   /* ---------- Relationer ---------- */
   .relrow { display: flex; align-items: center; gap: 12px; padding: 13px 16px; background: var(--panel);
     border: 1px solid var(--line); box-shadow: var(--shadow); margin-bottom: 8px; }
@@ -467,6 +478,10 @@
       <button class="tab sel" data-tab="players">Spelare</button>
       <button class="tab" data-tab="relations">Relationer</button>
       <button class="tab" data-tab="levels"><span data-svg="lockClosed"></span>Nivåer</button>
+      <div class="seg view-seg" id="truppViewSeg">
+        <button class="segbtn" data-view="grid" title="Kortvy" aria-label="Kortvy"><span data-svg="gridIc"></span></button>
+        <button class="segbtn" data-view="list" title="Listvy" aria-label="Listvy"><span data-svg="listIc"></span></button>
+      </div>
     </div>
     <div id="truppPlayers" class="grid"></div>
     <div id="truppRelations" class="hidden">
@@ -670,7 +685,9 @@ const SVG = {
   shuffle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h4l10 10h4"/><path d="M3 17h4l3-3M14 10l3-3h4"/><path d="M18 4l3 3-3 3M18 14l3 3-3 3"/></svg>',
   print: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8V4h10v4"/><rect x="4" y="8" width="16" height="8" rx="1"/><path d="M7 13h10v7H7z"/></svg>',
   download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M4 19h16"/></svg>',
-  upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4 19h16"/></svg>'
+  upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4 19h16"/></svg>',
+  gridIc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7"/><rect x="13" y="4" width="7" height="7"/><rect x="4" y="13" width="7" height="7"/><rect x="13" y="13" width="7" height="7"/></svg>',
+  listIc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>'
 };
 function fillSvg(scope){
   (scope||document).querySelectorAll('[data-svg]').forEach(el=>{
@@ -751,7 +768,7 @@ function freshRoot(){
     relations:[],    // {id,a,b,type:'good'|'vary'|'lock'}
     history:[],      // {id,ts,type,label,teams:[{name,vestId,players:[{id,name}]}]}
     cups:[],         // {id,name,date,numTeams,params,presentIds,teams}
-    settings:{ pinHash:null, posMode:'full', staleMonths:3, theme:'dark',
+    settings:{ pinHash:null, posMode:'full', staleMonths:3, theme:'dark', truppView:'grid',
       defaults:Object.assign({},DEFAULT_PARAMS), lastTraining:null }
   };
 }
@@ -1046,6 +1063,7 @@ document.querySelectorAll('#vTrupp .tab').forEach(t=>t.onclick=()=>{
 function renderTrupp(){
   renderNavCtx();
   document.querySelectorAll('#vTrupp .tab').forEach(t=>t.classList.toggle('sel',t.dataset.tab===truppTab));
+  $('truppViewSeg').classList.toggle('hidden',truppTab!=='players');
   $('truppPlayers').classList.toggle('hidden',truppTab!=='players');
   $('truppRelations').classList.toggle('hidden',truppTab!=='relations');
   $('truppLevels').classList.toggle('hidden',truppTab!=='levels');
@@ -1059,8 +1077,15 @@ function playerAvatar(p,cls){
   if(p.photo) return '<img class="avatar '+(cls||'')+'" src="'+p.photo+'" alt="">';
   return '<span class="avatar ph '+(cls||'')+'" style="color:'+esc(p.color||'#98989f')+'">'+esc(initials(p.name))+'</span>';
 }
+document.querySelectorAll('#truppViewSeg .segbtn').forEach(b=>b.onclick=()=>{
+  S().truppView=b.dataset.view; save(); renderPlayers();
+});
 function renderPlayers(){
   const g=$('truppPlayers');
+  const listMode=S().truppView==='list';
+  g.className=listMode?'plist':'grid';
+  document.querySelectorAll('#truppViewSeg .segbtn').forEach(b=>
+    b.classList.toggle('sel',b.dataset.view===(listMode?'list':'grid')));
   const ps=root.players.slice().sort((a,b)=>(b.active-a.active)||a.name.localeCompare(b.name,'sv'));
   if(!ps.length){ g.innerHTML='<div class="empty">Inga spelare ännu. Tryck ”+ Lägg till spelare”.</div>'; return; }
   g.innerHTML=ps.map(p=>{
@@ -1069,6 +1094,11 @@ function renderPlayers(){
     if(p.pos2) tags.push('<span class="postag">'+esc(posName(p.pos2))+'</span>');
     if(p.hand==='V') tags.push('<span class="postag hand">Vänsterhänt</span>');
     if(!p.active) tags.push('<span class="postag">Inaktiv</span>');
+    if(listMode) return '<div class="card click plistrow'+(p.active?'':' inactive')+'" data-pid="'+p.id+'">'+
+      playerAvatar(p)+
+      '<div class="pname">'+esc(p.name)+'</div>'+
+      '<div class="pmeta">'+tags.join('')+'</div>'+
+      '<span class="dot" style="background:'+esc(p.color||'#98989f')+'"></span></div>';
     return '<div class="card click pcard'+(p.active?'':' inactive')+'" data-pid="'+p.id+'">'+
       playerAvatar(p)+
       '<div class="pinfo"><div class="pname">'+esc(p.name)+'</div>'+
