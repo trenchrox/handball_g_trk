@@ -719,9 +719,13 @@ function fillSvg(scope){
 
 /* ---------- Konstanter ---------- */
 const POS_FULL=[['MV','Målvakt'],['M6','Mittsexa'],['V6','Vänstersexa'],['H6','Högersexa'],
-  ['M9','Mittnia'],['V9','Vänsternia'],['H9','Högernia'],['KV','Kant vänster'],['KH','Kant höger']];
+  ['M9','Mittnia'],['V9','Vänsternia'],['H9','Högernia']];
 const POS_SIMPLE=[['MV','Målvakt'],['BAK','Bak'],['MITT','Mitt'],['KANT','Kant']];
 const POS_NAMES={}; POS_FULL.concat(POS_SIMPLE).forEach(([c,n])=>POS_NAMES[c]=n);
+// Kantpositionerna är borttagna – sidan behålls via sexan. Kvar som alias så
+// att äldre data och inklistrade listor med kantbenämningar hamnar rätt.
+const POS_RETIRED={KV:'V6',KH:'H6'};
+function migratePos(p){ return p?(POS_RETIRED[p]||p):null; }
 const VESTS=[
   {id:'vit',    name:'Vit',    bg:'#f2f2f7', ink:'#1c1c1e'},
   {id:'rod',    name:'Röd',    bg:'#ff453a', ink:'#ffffff'},
@@ -780,7 +784,7 @@ function serieLabel(sel){
 // Gradering: en enda dold siffra 1–10. Osatt gradering räknas som mitten.
 const LEVELS=[1,2,3,4,5,6,7,8,9,10];
 const LEVEL_MID=5.5;
-const DATA_VERSION=2;   // 1 = gradering 1–5, 2 = gradering 1–10
+const DATA_VERSION=3;   // 1 = gradering 1–5, 2 = gradering 1–10, 3 = kantpositioner borttagna
 
 /* ---------- IndexedDB storage layer ---------- */
 const IDB_NAME='teambuilder', IDB_STORE='kv', IDB_KEY='root';
@@ -845,6 +849,12 @@ function normalizeRoot(d){
   if((d.version||1)<2){
     d.players.forEach(p=>{ if(typeof p.level==='number') p.level=Math.min(10,Math.max(1,p.level*2)); });
   }
+  // Kant vänster/höger togs bort ur positionslistan: flytta spelarna till
+  // sexan på samma sida i stället för att tappa positionen.
+  d.players.forEach(p=>{
+    p.pos=migratePos(p.pos); p.pos2=migratePos(p.pos2);
+    if(p.pos2&&p.pos2===p.pos) p.pos2=null;   // undvik dubbel efter flytten
+  });
   // Urval sparades tidigare som ett enda värde ('even'/1/2/3) – normalisera
   // till listform så flera nivåer kan väljas samtidigt.
   d.settings.truppFilter=normSel(d.settings.truppFilter);
@@ -1262,12 +1272,18 @@ function splitPasted(text){
   rows=rows.map(r=>{ while(r.length<width) r.push(''); return r; });
   return {rows,sep};
 }
+const POS_PASTE_ALIASES={
+  'kv':'V6','kh':'H6',
+  'kant vänster':'V6','kant vanster':'V6','vänsterkant':'V6','vansterkant':'V6','vk':'V6',
+  'kant höger':'H6','kant hoger':'H6','högerkant':'H6','hogerkant':'H6','hk':'H6',
+  'linje':'M6','linjespelare':'M6','mittsex':'M6'
+};
 function parsePastedPos(v){
   const s=String(v||'').trim().toLowerCase();
   if(!s) return null;
   for(const [c,n] of POS_FULL.concat(POS_SIMPLE))
     if(s===c.toLowerCase()||s===n.toLowerCase()) return c;
-  return null;
+  return POS_PASTE_ALIASES[s]||null;
 }
 function parsePastedHand(v){
   const s=String(v||'').trim().toLowerCase();
@@ -2184,7 +2200,8 @@ function importShare(d){
     let added=0;
     d.players.forEach(sp=>{
       if(!sp.name||names.has(String(sp.name).toLowerCase().trim())) return;
-      root.players.push({id:uid(),name:String(sp.name),pos:sp.pos||null,pos2:sp.pos2||null,
+      root.players.push({id:uid(),name:String(sp.name),
+        pos:migratePos(sp.pos),pos2:migratePos(sp.pos2),
         serie:SERIES.includes(sp.serie)?sp.serie:null,
         hand:sp.hand==='V'?'V':'H',color:sp.color||PLAYER_COLORS[0],photo:null,
         active:sp.active!==false,level:null,levelUpdated:null,note:''});
@@ -2209,7 +2226,11 @@ function importFull(d){
     const byId=new Set(root.players.map(p=>p.id));
     const byName=new Set(root.players.map(p=>p.name.toLowerCase().trim()));
     (d.players||[]).forEach(p=>{
-      if(p&&p.id&&!byId.has(p.id)&&p.name&&!byName.has(String(p.name).toLowerCase().trim())) root.players.push(p);
+      if(p&&p.id&&!byId.has(p.id)&&p.name&&!byName.has(String(p.name).toLowerCase().trim())){
+        p.pos=migratePos(p.pos); p.pos2=migratePos(p.pos2);
+        if(p.pos2&&p.pos2===p.pos) p.pos2=null;
+        root.players.push(p);
+      }
     });
     const relKeys=new Set(root.relations.map(r=>r.type+':'+pairKey(r.a,r.b)));
     (d.relations||[]).forEach(r=>{ if(r&&r.a&&r.b&&!relKeys.has(r.type+':'+pairKey(r.a,r.b))) root.relations.push(r); });
