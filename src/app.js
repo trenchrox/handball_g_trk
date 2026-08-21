@@ -146,7 +146,7 @@ function idbClear(){
 /* ---------- Datamodell ---------- */
 function freshRoot(){
   return {
-    version:DATA_VERSION, onboarded:false, squadName:'',
+    version:DATA_VERSION, onboarded:false, squadName:'', logo:null,
     players:[],      // {id,name,pos,pos2,serie,hand,color,photo,active,level,levelUpdated,def,defUpdated,note}
     relations:[],    // {id,a,b,type:'good'|'vary'|'lock'}
     history:[],      // {id,ts,type,label,teams:[{name,vestId,players:[{id,name}]}]}
@@ -180,6 +180,7 @@ function normalizeRoot(d){
   if(d.settings.lastTraining) d.settings.lastTraining.serie=normSel(d.settings.lastTraining.serie);
   d.cups.forEach(c=>{ c.serie=normSel(c.serie); });
   d.history.forEach(h=>{ if('serie' in h) h.serie=normSel(h.serie); });
+  if(typeof d.logo!=='string'||!d.logo.startsWith('data:image/')) d.logo=null;
   d.version=DATA_VERSION;
   return d;
 }
@@ -335,7 +336,34 @@ $('navLock').onclick=()=>{
   if(pinUnlocked){ setUnlocked(false); refreshView(); toast('Låst'); }
   else requirePin(()=>{ refreshView(); });
 };
+// Data-URL:en kan vara stor, så bilden byts bara ut när loggan faktiskt ändrats.
+let brandLogoShown=false;
+function renderBrandLogo(){
+  const box=$('brandLogo'), url=root.logo||null;
+  if(url!==brandLogoShown){
+    box.innerHTML=url?'<img src="'+url+'" alt="">':'';
+    brandLogoShown=url;
+  }
+  box.classList.toggle('hidden',!url);
+}
+// Loggan skalas ner till max 256 px och sparas som PNG så att genomskinliga
+// klubbmärken behåller sin bakgrund i både mörkt och ljust läge.
+function readLogoFile(f,done){
+  const img=new Image();
+  img.onload=()=>{
+    const m=256, k=Math.min(1,m/Math.max(img.width,img.height));
+    const c=document.createElement('canvas');
+    c.width=Math.max(1,Math.round(img.width*k));
+    c.height=Math.max(1,Math.round(img.height*k));
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    URL.revokeObjectURL(img.src);
+    done(c.toDataURL('image/png'));
+  };
+  img.onerror=()=>{ URL.revokeObjectURL(img.src); toast('Kunde inte läsa bildfilen'); };
+  img.src=URL.createObjectURL(f);
+}
 function renderNavCtx(){
+  renderBrandLogo();
   const act=root.players.filter(p=>p.active).length;
   const inact=root.players.length-act;
   $('navCtx').innerHTML=(root.squadName?'<b>'+esc(root.squadName)+'</b><br>':'')+
@@ -1705,6 +1733,7 @@ function reuseDivision(h){
 function renderSettings(){
   $('setSquadName').value=root.squadName||'';
   $('setSquadName').onchange=e=>{ root.squadName=e.target.value.trim(); save(); renderNavCtx(); };
+  renderLogoRow();
   $('setPosMode').value=S().posMode;
   $('setPosMode').onchange=e=>{ S().posMode=e.target.value; save(); };
   $('setStale').value=String(S().staleMonths||3);
@@ -1715,6 +1744,22 @@ function renderSettings(){
     box.appendChild(switchRow(label.replace('{N}','lag/grupp'),hint,!!S().defaults[key],v=>{ S().defaults[key]=v; save(); }));
   });
 }
+function renderLogoRow(){
+  $('setLogoPrev').innerHTML=root.logo?'<img src="'+root.logo+'" alt="">':'';
+  $('setLogoDel').classList.toggle('hidden',!root.logo);
+}
+$('setLogoFile').onchange=e=>{
+  const f=e.target.files[0]; e.target.value='';
+  if(!f) return;
+  readLogoFile(f,url=>{
+    root.logo=url; save();
+    renderLogoRow(); renderBrandLogo(); toast('Laglogga sparad');
+  });
+};
+$('setLogoDel').onclick=()=>{
+  root.logo=null; save();
+  renderLogoRow(); renderBrandLogo(); toast('Laglogga borttagen');
+};
 $('setPinBtn').onclick=()=>{
   const has=!!S().pinHash;
   const w=modal('<h2>'+(has?'Ändra PIN':'Sätt PIN')+'</h2>'+

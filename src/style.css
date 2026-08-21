@@ -72,6 +72,10 @@
     padding: 22px 14px; height: 100vh;
   }
   nav .brand { padding: 4px 12px 22px; text-align: center; }
+  /* Loggan får ta plats utan att trycka undan namnet: fast höjd, fri bredd. */
+  nav .brand .brand-logo { height: 62px; margin-bottom: 12px; display: flex;
+    align-items: center; justify-content: center; }
+  nav .brand .brand-logo img { max-height: 62px; max-width: 100%; object-fit: contain; }
   nav .brand .brand-name { font-family:'Big Shoulders','Instrument Sans',sans-serif; font-size: 30px;
     font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; line-height: 1; }
   nav .brand .brand-name b { color: var(--accent); font-weight: 700; }
@@ -471,6 +475,12 @@
   .set-row .lbl { font-size: 15px; font-weight: 600; }
   .set-row .hint2 { font-size: 12px; color: var(--ink-faint); margin-top: 2px; max-width: 340px; line-height: 1.45; }
   .set-row select, .set-row input { width: auto; min-width: 120px; margin-bottom: 0; padding: 10px 12px; font-size: 14px; }
+  .logo-pick { display: flex; align-items: center; gap: 10px; }
+  .logo-pick .topbtn { white-space: nowrap; }
+  .logo-prev:empty { display: none; }
+  .logo-prev { display: flex; align-items: center; justify-content: center; width: 64px; height: 46px;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+  .logo-prev img { max-width: 56px; max-height: 38px; object-fit: contain; }
 
   /* ---------- Utskrift ---------- */
   #printArea { display: none; }
@@ -496,6 +506,8 @@
     :root { --nav-w: 64px; }
     nav .brand .brand-name { font-size: 15px; }
     nav .brand .brand-sub { display: none; }
+    nav .brand .brand-logo { height: 38px; margin-bottom: 8px; }
+    nav .brand .brand-logo img { max-height: 38px; }
     .navlink span:not(.ic) { display: none; }
     nav .ctx { display: none; }
     .navlink { justify-content: center; }

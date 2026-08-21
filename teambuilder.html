@@ -87,6 +87,10 @@
     padding: 22px 14px; height: 100vh;
   }
   nav .brand { padding: 4px 12px 22px; text-align: center; }
+  /* Loggan får ta plats utan att trycka undan namnet: fast höjd, fri bredd. */
+  nav .brand .brand-logo { height: 62px; margin-bottom: 12px; display: flex;
+    align-items: center; justify-content: center; }
+  nav .brand .brand-logo img { max-height: 62px; max-width: 100%; object-fit: contain; }
   nav .brand .brand-name { font-family:'Big Shoulders','Instrument Sans',sans-serif; font-size: 30px;
     font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; line-height: 1; }
   nav .brand .brand-name b { color: var(--accent); font-weight: 700; }
@@ -486,6 +490,12 @@
   .set-row .lbl { font-size: 15px; font-weight: 600; }
   .set-row .hint2 { font-size: 12px; color: var(--ink-faint); margin-top: 2px; max-width: 340px; line-height: 1.45; }
   .set-row select, .set-row input { width: auto; min-width: 120px; margin-bottom: 0; padding: 10px 12px; font-size: 14px; }
+  .logo-pick { display: flex; align-items: center; gap: 10px; }
+  .logo-pick .topbtn { white-space: nowrap; }
+  .logo-prev:empty { display: none; }
+  .logo-prev { display: flex; align-items: center; justify-content: center; width: 64px; height: 46px;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+  .logo-prev img { max-width: 56px; max-height: 38px; object-fit: contain; }
 
   /* ---------- Utskrift ---------- */
   #printArea { display: none; }
@@ -511,6 +521,8 @@
     :root { --nav-w: 64px; }
     nav .brand .brand-name { font-size: 15px; }
     nav .brand .brand-sub { display: none; }
+    nav .brand .brand-logo { height: 38px; margin-bottom: 8px; }
+    nav .brand .brand-logo img { max-height: 38px; }
     .navlink span:not(.ic) { display: none; }
     nav .ctx { display: none; }
     .navlink { justify-content: center; }
@@ -541,6 +553,7 @@
 <!-- ---------- Nav ---------- -->
 <nav>
   <div class="brand">
+    <div class="brand-logo hidden" id="brandLogo"></div>
     <div class="brand-name">Team<b>builder</b></div>
     <div class="brand-sub">Lagindelning</div>
   </div>
@@ -679,6 +692,15 @@
       <div class="set-row">
         <div><div class="lbl">Truppens namn</div></div>
         <input id="setSquadName" placeholder="t.ex. P12" style="max-width:200px">
+      </div>
+      <div class="set-row">
+        <div><div class="lbl">Laglogga</div>
+          <div class="hint2">Visas överst i menyn till vänster. Sparas bara på den här enheten.</div></div>
+        <div class="logo-pick">
+          <span class="logo-prev" id="setLogoPrev"></span>
+          <label class="topbtn upload"><span data-svg="upload"></span> Välj bild<input id="setLogoFile" type="file" accept="image/*" style="display:none"></label>
+          <button class="topbtn hidden" id="setLogoDel">Ta bort</button>
+        </div>
       </div>
       <div class="set-row">
         <div><div class="lbl">Positionsläge</div>
@@ -892,7 +914,7 @@ function idbClear(){
 /* ---------- Datamodell ---------- */
 function freshRoot(){
   return {
-    version:DATA_VERSION, onboarded:false, squadName:'',
+    version:DATA_VERSION, onboarded:false, squadName:'', logo:null,
     players:[],      // {id,name,pos,pos2,serie,hand,color,photo,active,level,levelUpdated,def,defUpdated,note}
     relations:[],    // {id,a,b,type:'good'|'vary'|'lock'}
     history:[],      // {id,ts,type,label,teams:[{name,vestId,players:[{id,name}]}]}
@@ -926,6 +948,7 @@ function normalizeRoot(d){
   if(d.settings.lastTraining) d.settings.lastTraining.serie=normSel(d.settings.lastTraining.serie);
   d.cups.forEach(c=>{ c.serie=normSel(c.serie); });
   d.history.forEach(h=>{ if('serie' in h) h.serie=normSel(h.serie); });
+  if(typeof d.logo!=='string'||!d.logo.startsWith('data:image/')) d.logo=null;
   d.version=DATA_VERSION;
   return d;
 }
@@ -1081,7 +1104,34 @@ $('navLock').onclick=()=>{
   if(pinUnlocked){ setUnlocked(false); refreshView(); toast('Låst'); }
   else requirePin(()=>{ refreshView(); });
 };
+// Data-URL:en kan vara stor, så bilden byts bara ut när loggan faktiskt ändrats.
+let brandLogoShown=false;
+function renderBrandLogo(){
+  const box=$('brandLogo'), url=root.logo||null;
+  if(url!==brandLogoShown){
+    box.innerHTML=url?'<img src="'+url+'" alt="">':'';
+    brandLogoShown=url;
+  }
+  box.classList.toggle('hidden',!url);
+}
+// Loggan skalas ner till max 256 px och sparas som PNG så att genomskinliga
+// klubbmärken behåller sin bakgrund i både mörkt och ljust läge.
+function readLogoFile(f,done){
+  const img=new Image();
+  img.onload=()=>{
+    const m=256, k=Math.min(1,m/Math.max(img.width,img.height));
+    const c=document.createElement('canvas');
+    c.width=Math.max(1,Math.round(img.width*k));
+    c.height=Math.max(1,Math.round(img.height*k));
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    URL.revokeObjectURL(img.src);
+    done(c.toDataURL('image/png'));
+  };
+  img.onerror=()=>{ URL.revokeObjectURL(img.src); toast('Kunde inte läsa bildfilen'); };
+  img.src=URL.createObjectURL(f);
+}
 function renderNavCtx(){
+  renderBrandLogo();
   const act=root.players.filter(p=>p.active).length;
   const inact=root.players.length-act;
   $('navCtx').innerHTML=(root.squadName?'<b>'+esc(root.squadName)+'</b><br>':'')+
@@ -2451,6 +2501,7 @@ function reuseDivision(h){
 function renderSettings(){
   $('setSquadName').value=root.squadName||'';
   $('setSquadName').onchange=e=>{ root.squadName=e.target.value.trim(); save(); renderNavCtx(); };
+  renderLogoRow();
   $('setPosMode').value=S().posMode;
   $('setPosMode').onchange=e=>{ S().posMode=e.target.value; save(); };
   $('setStale').value=String(S().staleMonths||3);
@@ -2461,6 +2512,22 @@ function renderSettings(){
     box.appendChild(switchRow(label.replace('{N}','lag/grupp'),hint,!!S().defaults[key],v=>{ S().defaults[key]=v; save(); }));
   });
 }
+function renderLogoRow(){
+  $('setLogoPrev').innerHTML=root.logo?'<img src="'+root.logo+'" alt="">':'';
+  $('setLogoDel').classList.toggle('hidden',!root.logo);
+}
+$('setLogoFile').onchange=e=>{
+  const f=e.target.files[0]; e.target.value='';
+  if(!f) return;
+  readLogoFile(f,url=>{
+    root.logo=url; save();
+    renderLogoRow(); renderBrandLogo(); toast('Laglogga sparad');
+  });
+};
+$('setLogoDel').onclick=()=>{
+  root.logo=null; save();
+  renderLogoRow(); renderBrandLogo(); toast('Laglogga borttagen');
+};
 $('setPinBtn').onclick=()=>{
   const has=!!S().pinHash;
   const w=modal('<h2>'+(has?'Ändra PIN':'Sätt PIN')+'</h2>'+

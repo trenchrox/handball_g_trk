@@ -21,6 +21,7 @@
 <!-- ---------- Nav ---------- -->
 <nav>
   <div class="brand">
+    <div class="brand-logo hidden" id="brandLogo"></div>
     <div class="brand-name">Team<b>builder</b></div>
     <div class="brand-sub">Lagindelning</div>
   </div>
@@ -159,6 +160,15 @@
       <div class="set-row">
         <div><div class="lbl">Truppens namn</div></div>
         <input id="setSquadName" placeholder="t.ex. P12" style="max-width:200px">
+      </div>
+      <div class="set-row">
+        <div><div class="lbl">Laglogga</div>
+          <div class="hint2">Visas överst i menyn till vänster. Sparas bara på den här enheten.</div></div>
+        <div class="logo-pick">
+          <span class="logo-prev" id="setLogoPrev"></span>
+          <label class="topbtn upload"><span data-svg="upload"></span> Välj bild<input id="setLogoFile" type="file" accept="image/*" style="display:none"></label>
+          <button class="topbtn hidden" id="setLogoDel">Ta bort</button>
+        </div>
       </div>
       <div class="set-row">
         <div><div class="lbl">Positionsläge</div>
