@@ -30,6 +30,8 @@
   <button class="navlink" data-nav="vHistory"><span class="ic" data-svg="clock"></span>Historik</button>
   <button class="navlink" data-nav="vSettings"><span class="ic" data-svg="gear"></span>Inställningar</button>
   <div class="spacer"></div>
+  <button class="navlink" id="navExportFull"><span class="ic" data-svg="download"></span>Exportera backup</button>
+  <button class="navlink" id="navExportShare"><span class="ic" data-svg="share"></span>Dela trupp</button>
   <button class="navlink" id="navLock"><span class="ic" id="navLockIc"></span><span id="navLockLabel">Lås upp</span></button>
   <button class="navlink" id="themeToggle"><span class="ic" id="themeIcon">☾</span><span id="themeLabel">Mörkt läge</span></button>
   <div class="ctx" id="navCtx"></div>
@@ -52,6 +54,7 @@
       <button class="tab sel" data-tab="players">Spelare</button>
       <button class="tab" data-tab="relations">Relationer</button>
       <button class="tab" data-tab="levels"><span data-svg="lockClosed"></span>Nivåer</button>
+      <button class="tab" data-tab="pitch"><span data-svg="pitch"></span>Positioner</button>
       <div class="seg view-seg" id="truppViewSeg">
         <button class="segbtn" data-view="grid" title="Kortvy" aria-label="Kortvy"><span data-svg="gridIc"></span></button>
         <button class="segbtn" data-view="list" title="Listvy" aria-label="Listvy"><span data-svg="listIc"></span></button>
@@ -76,6 +79,7 @@
       <div id="relList"></div>
     </div>
     <div id="truppLevels" class="hidden"></div>
+    <div id="truppPitch" class="hidden"></div>
   </div>
 
   <!-- ---------- 2. Träning ---------- -->
@@ -194,16 +198,9 @@
 
     <div class="set-section">
       <h3>Backup &amp; delning</h3>
-      <div class="set-row">
-        <div><div class="lbl">Full backup</div>
-          <div class="hint2">All data inklusive nivåer och anteckningar. Spara på säker plats.</div></div>
-        <button class="topbtn acc" id="exportFullBtn"><span data-svg="download"></span> Exportera</button>
-      </div>
-      <div class="set-row">
-        <div><div class="lbl">Dela trupp</div>
-          <div class="hint2">Endast namn, positioner och hänthet – utan nivåsiffror och anteckningar.</div></div>
-        <button class="topbtn" id="exportShareBtn"><span data-svg="download"></span> Exportera</button>
-      </div>
+      <p class="hint" style="margin:0 0 6px">Exporterna ligger i menyn till vänster: <b>Exportera backup</b> tar
+        allt inklusive bedömningar och anteckningar, <b>Dela trupp</b> tar namn, positioner, hänthet och
+        serienivå – utan bedömningar.</p>
       <div class="set-row">
         <div><div class="lbl">Importera</div>
           <div class="hint2">JSON-backup eller delad trupp. Välj ersätt eller slå ihop vid import.</div></div>

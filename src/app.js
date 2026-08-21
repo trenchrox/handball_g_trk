@@ -18,6 +18,8 @@ const SVG = {
   download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M4 19h16"/></svg>',
   upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4 19h16"/></svg>',
   gridIc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7"/><rect x="13" y="4" width="7" height="7"/><rect x="4" y="13" width="7" height="7"/><rect x="13" y="13" width="7" height="7"/></svg>',
+  share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.4 10.8 15.6 6.4M8.4 13.2l7.2 4.4"/></svg>',
+  pitch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 10h2a2.4 2.4 0 0 1 0 4H3M21 10h-2a2.4 2.4 0 0 0 0 4h2M12 5v14"/></svg>',
   repeat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 8-8c3 0 5.6 1.7 7 4.2"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-8 8c-3 0-5.6-1.7-7-4.2"/><path d="M4 20v-5h5"/></svg>',
   paste: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M9.5 10h5M9.5 14h5"/></svg>',
   listIc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>'
@@ -38,15 +40,16 @@ const POS_NAMES={}; POS_FULL.concat(POS_SIMPLE).forEach(([c,n])=>POS_NAMES[c]=n)
 const POS_RETIRED={KV:'V6',KH:'H6'};
 function migratePos(p){ return p?(POS_RETIRED[p]||p):null; }
 const VESTS=[
+  {id:'svart',  name:'Svart',  bg:'#141416', ink:'#ffffff'},
   {id:'vit',    name:'Vit',    bg:'#f2f2f7', ink:'#1c1c1e'},
-  {id:'rod',    name:'Röd',    bg:'#ff453a', ink:'#ffffff'},
-  {id:'bla',    name:'Blå',    bg:'#0a84ff', ink:'#ffffff'},
+  {id:'vinrod', name:'Vinröd', bg:'#8e1537', ink:'#ffffff'},
   {id:'gul',    name:'Gul',    bg:'#ffd60a', ink:'#1a1205'},
+  {id:'bla',    name:'Blå',    bg:'#0a84ff', ink:'#ffffff'},
   {id:'gron',   name:'Grön',   bg:'#30d158', ink:'#04231b'},
-  {id:'orange', name:'Orange', bg:'#ff9f0a', ink:'#2b1502'},
-  {id:'lila',   name:'Lila',   bg:'#bf5af2', ink:'#ffffff'},
-  {id:'svart',  name:'Svart',  bg:'#3a3a3c', ink:'#ffffff'}
+  {id:'rod',    name:'Röd',    bg:'#ff453a', ink:'#ffffff'}
 ];
+// Utgångna västfärger pekas om så gamla lag inte tystnar i fel färg.
+const VEST_RETIRED={orange:'gul',lila:'bla'};
 // Träning delar in i grupper, cup i lag – samma mekanik, olika ord.
 const TRAIN_PREFIX='Grupp ', CUP_PREFIX='Lag ';
 const PLAYER_COLORS=['#0a84ff','#30d158','#ff453a','#ffd60a','#ff9f0a','#bf5af2','#64d2ff','#ff6482','#98989f'];
@@ -198,7 +201,7 @@ function fmtDate(ts){ return new Date(ts).toLocaleDateString('sv-SE',{weekday:'s
 function fmtDateShort(ts){ const d=new Date(ts); return d.getDate()+'/'+(d.getMonth()+1); }
 function pairKey(a,b){ return a<b?a+'|'+b:b+'|'+a; }
 function initials(name){ return name.trim().split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); }
-function vestById(id){ return VESTS.find(v=>v.id===id)||VESTS[0]; }
+function vestById(id){ return VESTS.find(v=>v.id===(VEST_RETIRED[id]||id))||VESTS[0]; }
 function toast(msg){
   let t=$('toastEl');
   if(!t){ t=document.createElement('div'); t.id='toastEl';
@@ -509,14 +512,19 @@ function renderTrupp(){
   renderNavCtx();
   document.querySelectorAll('#vTrupp .tab').forEach(t=>t.classList.toggle('sel',t.dataset.tab===truppTab));
   $('truppViewSeg').classList.toggle('hidden',truppTab!=='players');
-  $('truppFilter').classList.toggle('hidden',truppTab!=='players');
+  // Nivåfiltret styr även planvyn, så det ska vara synligt och ändringsbart där.
+  // Positionsfiltret hör bara till listan – på planen vore det cirkelresonemang.
+  $('truppFilter').classList.toggle('hidden',truppTab!=='players'&&truppTab!=='pitch');
   $('truppPosFilter').classList.toggle('hidden',truppTab!=='players');
   $('truppPlayers').classList.toggle('hidden',truppTab!=='players');
   $('truppRelations').classList.toggle('hidden',truppTab!=='relations');
   $('truppLevels').classList.toggle('hidden',truppTab!=='levels');
+  $('truppPitch').classList.toggle('hidden',truppTab!=='pitch');
   const act=root.players.filter(p=>p.active).length;
   const sel=normSel(S().truppFilter), posSel=S().truppPos||[];
   if(!root.players.length) $('truppSub').textContent='Spelarregister, relationer och nivåer.';
+  else if(truppTab==='pitch') $('truppSub').textContent='Så många spelare du har på varje position'+
+    (sel.length?' i '+serieLabel(sel).toLowerCase():'');
   else if(truppTab==='players'&&(sel.length||posSel.length)){
     const shown=root.players.filter(p=>inSel(p,sel)&&inPosSel(p,posSel)).length;
     $('truppSub').textContent='Visar '+filterLabel(sel,posSel)+
@@ -525,8 +533,73 @@ function renderTrupp(){
   else $('truppSub').textContent=act+' aktiva spelare'+(root.players.length-act?' · '+(root.players.length-act)+' inaktiva':'');
   if(truppTab==='players') renderPlayers();
   else if(truppTab==='relations') renderRelations();
+  else if(truppTab==='pitch') renderPitch();
   else renderLevels();
 }
+/* ---------- Positionsöversikt: halv plan med antal per position ---------- */
+// Koordinater i SVG:ns viewBox (0 0 400 360). Mål uppe i mitten, 6- och
+// 9-meterslinjen bågar nedåt – tränartavlans vy. Raderna ligger med god
+// marginal från varandra så cirklarna aldrig krockar.
+const PITCH_SPOTS={
+  full:[['MV',200,72],['V6',108,155],['M6',200,155],['H6',292,155],
+        ['V9',92,262],['M9',200,262],['H9',308,262]],
+  simple:[['MV',200,72],['KANT',86,168],['MITT',200,155],['KANT2',314,168],['BAK',200,262]]
+};
+function renderPitch(){
+  const box=$('truppPitch');
+  const sel=normSel(S().truppFilter);
+  const pool=root.players.filter(p=>p.active&&inSel(p,sel));
+  if(!pool.length){
+    box.innerHTML='<div class="empty">'+(root.players.length
+      ?'Inga aktiva spelare i urvalet '+esc(serieLabel(sel))+'.'
+      :'Inga spelare ännu. Tryck ”+ Lägg till spelare”.')+'</div>';
+    return;
+  }
+  // Räkna primär position; sekundär räknas separat så den inte blåser upp siffran.
+  const prim={}, sec={};
+  pool.forEach(p=>{ if(p.pos) prim[p.pos]=(prim[p.pos]||0)+1;
+                    if(p.pos2) sec[p.pos2]=(sec[p.pos2]||0)+1; });
+  const noPos=pool.filter(p=>!p.pos).length;
+  const simple=S().posMode==='simple';
+  const spots=PITCH_SPOTS[simple?'simple':'full'];
+
+  const marks=spots.map(([codeRaw,x,y])=>{
+    const code=codeRaw==='KANT2'?'KANT':codeRaw;   // två kantrutor, samma kod
+    const n=prim[code]||0, s=sec[code]||0;
+    const cls='pspot'+(n?'':' empty')+(code==='MV'?' gk':'');
+    return '<g class="'+cls+'" data-pos="'+code+'" tabindex="0" role="button">'+
+      '<circle cx="'+x+'" cy="'+y+'" r="26"/>'+
+      '<text class="ps-n" x="'+x+'" y="'+(y+2)+'">'+n+'</text>'+
+      '<text class="ps-c" x="'+x+'" y="'+(y+44)+'">'+esc(code)+'</text>'+
+      (s?'<text class="ps-s" x="'+x+'" y="'+(y-32)+'">+'+s+'</text>':'')+
+      '</g>';
+  }).join('');
+
+  box.innerHTML='<div class="pitchwrap"><svg viewBox="0 0 400 336" class="pitch" '+
+    'role="img" aria-label="Antal spelare per position">'+
+    '<rect class="pf" x="8" y="8" width="384" height="320" rx="3"/>'+
+    '<path class="pl" d="M8 26 H392"/>'+                       // mållinje
+    '<rect class="pgoal" x="166" y="17" width="68" height="9"/>'+
+    '<path class="pl6" d="M48 26 Q200 364 352 26"/>'+          // 6-meterslinje
+    '<path class="pl9" d="M14 26 Q200 584 386 26"/>'+          // 9-meter, streckad
+    marks+'</svg></div>'+
+    '<div class="pitchlegend">'+
+      '<span class="pl-item"><b>'+pool.length+'</b> spelare i urvalet</span>'+
+      '<span class="pl-item"><span class="pl-dot sec"></span>+n = sekundär position</span>'+
+      (noPos?'<button class="fchip" id="pitchNoPos">Utan position<span class="n">'+noPos+'</span></button>':'')+
+    '</div>'+
+    '<p class="hint">Tryck på en position för att se spelarna i truppen.</p>';
+
+  // Ett tryck filtrerar trupplistan på positionen – tavlan blir en väg in.
+  box.querySelectorAll('[data-pos]').forEach(g=>{
+    const go=()=>{ S().truppPos=[g.dataset.pos]; save(); truppTab='players'; renderTrupp(); };
+    g.onclick=go;
+    g.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } };
+  });
+  const np=box.querySelector('#pitchNoPos');
+  if(np) np.onclick=()=>{ S().truppPos=['none']; save(); truppTab='players'; renderTrupp(); };
+}
+
 function playerAvatar(p,cls){
   if(p.photo) return '<img class="avatar '+(cls||'')+'" src="'+p.photo+'" alt="">';
   return '<span class="avatar ph '+(cls||'')+'" style="color:'+esc(p.color||'#98989f')+'">'+esc(initials(p.name))+'</span>';
@@ -1658,11 +1731,12 @@ async function downloadJson(obj,filename,okMsg){
   toast(okMsg);
 }
 function today(){ return new Date().toISOString().slice(0,10); }
-$('exportFullBtn').onclick=()=>{
+// Exporterna nås från sidomenyn, så de är en knapptryckning bort i varje vy.
+$('navExportFull').onclick=()=>{
   downloadJson(Object.assign({exportType:'teambuilder-full',exportedAt:Date.now()},root),
     'teambuilder-backup-'+today()+'.json','Full backup exporterad');
 };
-$('exportShareBtn').onclick=()=>{
+$('navExportShare').onclick=()=>{
   downloadJson({exportType:'teambuilder-share',exportedAt:Date.now(),squadName:root.squadName,
     players:root.players.map(p=>({name:p.name,pos:p.pos,pos2:p.pos2,serie:p.serie,hand:p.hand,color:p.color,active:p.active}))},
     'teambuilder-trupp-'+today()+'.json','Trupp exporterad – utan graderingar och anteckningar');

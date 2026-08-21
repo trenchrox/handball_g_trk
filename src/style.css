@@ -211,7 +211,10 @@
   .tile .pos { font-size: 11px; color: var(--ink-faint); font-weight: 700; flex-shrink: 0; }
   .tile.on { background: rgba(10,132,255,0.16); border-color: var(--accent); }
   .tile.on .pos { color: var(--accent); }
-  .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.25); }
+  /* Ljus ring så även svart väst syns mot det mörka kortet */
+  .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.25);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.16); }
+  body.light .dot { box-shadow: none; }
   .avatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
     background: var(--panel-2); }
   .avatar.ph { display: flex; align-items: center; justify-content: center; font-size: 12px;
@@ -282,6 +285,37 @@
     transition: var(--tap); }
   .cardDel:active { transform: scale(0.9); color: var(--goal); border-color: var(--goal-d); }
 
+  /* ---------- Positionsöversikt (tränartavla) ---------- */
+  .pitchwrap { background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow);
+    padding: 18px; max-width: 720px; }
+  .pitch { display: block; width: 100%; height: auto; }
+  .pitch .pf { fill: rgba(10,132,255,0.05); stroke: var(--line-2); stroke-width: 1.5; }
+  body.light .pitch .pf { fill: rgba(10,132,255,0.06); }
+  .pitch .pl { stroke: var(--line-2); stroke-width: 1.5; fill: none; }
+  .pitch .pgoal { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+  .pitch .pl6 { stroke: var(--line-2); stroke-width: 1.5; fill: none; }
+  .pitch .pl9 { stroke: var(--line-2); stroke-width: 1.5; fill: none; stroke-dasharray: 7 7; }
+  .pitch .pspot { cursor: pointer; }
+  .pitch .pspot circle { fill: var(--accent); stroke: none; transition: var(--tap); }
+  .pitch .pspot.gk circle { fill: var(--save); }
+  .pitch .pspot.empty circle { fill: var(--panel-2); stroke: var(--line-2); stroke-width: 1.5; }
+  .pitch .pspot:active circle { opacity: 0.7; }
+  .pitch .pspot:focus { outline: none; }
+  .pitch .pspot:focus circle { stroke: var(--ink); stroke-width: 2; }
+  .pitch .ps-n { fill: #fff; font-family: 'Big Shoulders','Instrument Sans',sans-serif;
+    font-size: 26px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; }
+  .pitch .pspot.empty .ps-n { fill: var(--ink-faint); }
+  .pitch .ps-c { fill: var(--ink-dim); font-family: 'Instrument Sans',sans-serif; font-size: 13px;
+    font-weight: 700; text-anchor: middle; letter-spacing: 0.06em; }
+  .pitch .ps-s { fill: var(--accent-2); font-family: 'Instrument Sans',sans-serif; font-size: 12px;
+    font-weight: 700; text-anchor: middle; }
+  .pitchlegend { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: 16px;
+    max-width: 720px; font-size: 12.5px; color: var(--ink-dim); }
+  .pitchlegend b { color: var(--ink); font-size: 15px; }
+  .pl-item { display: inline-flex; align-items: center; gap: 7px; }
+  .pl-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent-2); }
+  .pitchlegend .fchip { margin-left: auto; }
+
   /* ---------- Nivåflik ---------- */
   .lvlrow { display: flex; align-items: center; gap: 14px; padding: 12px 16px; background: var(--panel);
     border: 1px solid var(--line); box-shadow: var(--shadow); margin-bottom: 8px; }
@@ -337,7 +371,7 @@
   .teamcard.dropover { border-color: var(--accent); background: rgba(10,132,255,0.08); }
   .team-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px;
     border-bottom: 1px solid var(--line); }
-  .vest { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; border: 2px solid rgba(255,255,255,0.25);
+  .vest { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; border: 2px solid rgba(255,255,255,0.42);
     cursor: pointer; transition: var(--tap); }
   .vest:active { transform: scale(0.88); }
   .team-name { font-family:'Big Shoulders','Instrument Sans',sans-serif; font-size: 22px; font-weight: 700;
