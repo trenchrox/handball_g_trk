@@ -391,6 +391,9 @@
     margin-bottom: 8px; }
   .hist-team .ht-name .dot { width: 14px; height: 14px; }
   .hist-team ul { margin: 0; padding: 0; list-style: none; font-size: 13.5px; color: var(--ink-dim); line-height: 1.7; }
+  .hist-actions { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .hist-actions .hint { margin: 0; }
 
   /* ---------- Modal ---------- */
   .modal-wrap { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center;
@@ -720,6 +723,7 @@ const SVG = {
   download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M4 19h16"/></svg>',
   upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4 19h16"/></svg>',
   gridIc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7"/><rect x="13" y="4" width="7" height="7"/><rect x="4" y="13" width="7" height="7"/><rect x="13" y="13" width="7" height="7"/></svg>',
+  repeat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 8-8c3 0 5.6 1.7 7 4.2"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-8 8c-3 0-5.6-1.7-7-4.2"/><path d="M4 20v-5h5"/></svg>',
   paste: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M9.5 10h5M9.5 14h5"/></svg>',
   listIc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>'
 };
@@ -2163,7 +2167,12 @@ function renderHistory(){
       const v=vestById(t.vestId);
       return '<div class="hist-team"><div class="ht-name"><span class="dot" style="background:'+v.bg+'"></span>'+esc(t.name)+'</div>'+
         '<ul>'+t.players.map(p=>'<li>'+esc(p.name)+'</li>').join('')+'</ul></div>';
-    }).join('')+'</div></details>').join('');
+    }).join('')+'</div>'+
+    '<div class="hist-actions">'+
+      '<p class="hint">Lägger in samma grupper som dagens träningsgrupper. Den här posten lämnas orörd.</p>'+
+      '<button class="topbtn acc" data-reuse="'+h.id+'"><span data-svg="repeat"></span> Använd igen</button>'+
+    '</div></details>').join('');
+  fillSvg(L);
   L.querySelectorAll('[data-hid]').forEach(el=>el.onclick=e=>{
     e.preventDefault(); e.stopPropagation();
     confirmModal('Ta bort indelning?','Posten tas bort ur historiken.','Ta bort',()=>{
@@ -2171,6 +2180,41 @@ function renderHistory(){
       save(); renderHistory();
     },true);
   });
+  L.querySelectorAll('[data-reuse]').forEach(el=>el.onclick=e=>{
+    e.preventDefault(); e.stopPropagation();
+    const h=root.history.find(x=>x.id===el.dataset.reuse);
+    if(h) reuseDivision(h);
+  });
+}
+// Läs tillbaka en tidigare indelning som dagens träningsgrupper. Spelare som
+// tagits bort eller inaktiverats sedan dess kan inte återskapas och utesluts.
+function reuseDivision(h){
+  const groups=h.teams.map(t=>({
+    name:t.name, vestId:t.vestId,
+    playerIds:t.players.map(pl=>pl.id).filter(id=>{ const p=pById(id); return p&&p.active; })
+  })).filter(g=>g.playerIds.length);
+  const kept=groups.reduce((s,g)=>s+g.playerIds.length,0);
+  const total=h.teams.reduce((s,t)=>s+t.players.length,0);
+  if(groups.length<2||kept<2){
+    toast('För få spelare finns kvar för att återanvända indelningen');
+    return;
+  }
+  training.serie=normSel(h.serie);
+  training.present=new Set();
+  groups.forEach(g=>g.playerIds.forEach(id=>training.present.add(id)));
+  training.tempLocks=[]; training.lockSel=null; training.showBalance=false;
+  // så popupen visar rätt antal om man slumpar om efteråt
+  if(groups.length>=2&&groups.length<=4) training.countMode=String(groups.length);
+  else { training.countMode='custom'; training.customCount=groups.length; }
+  training.result={teams:groups};
+  recomputeAvgs(training.result);
+  training.historyId=null;      // sparas som en ny post – originalet rörs inte
+  saveTrainingHistory();
+  training.phase='result';
+  show('vTraining');
+  const dropped=total-kept;
+  toast(dropped?('Grupper återanvända · '+dropped+' spelare finns inte kvar')
+    :'Grupper återanvända');
 }
 
 /* =====================================================================
