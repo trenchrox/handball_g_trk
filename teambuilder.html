@@ -265,7 +265,10 @@
   .pastesum .names { color: var(--ink-dim); margin-top: 6px; font-size: 12.5px; }
 
   /* ---------- Filterknappar (nivåer i truppvyn) ---------- */
-  .filterbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
+  .filterbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; align-items: center; }
+  .fb-lbl { font-size: 10px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase;
+    letter-spacing: 0.1em; margin-right: 2px; }
+  .fb-lbl:not(:first-child) { margin-left: 14px; padding-left: 14px; border-left: 1px solid var(--line-2); }
   .fchip { background: var(--panel-2); color: var(--ink-dim); border: 1px solid var(--line);
     border-radius: 0; padding: 9px 14px; font-size: 12.5px; font-weight: 700; transition: var(--tap);
     display: inline-flex; align-items: center; gap: 7px; }
@@ -859,7 +862,7 @@ function freshRoot(){
     history:[],      // {id,ts,type,label,teams:[{name,vestId,players:[{id,name}]}]}
     cups:[],         // {id,name,date,numTeams,params,presentIds,teams}
     settings:{ pinHash:null, posMode:'full', staleMonths:3, theme:'dark',
-      truppView:'grid', truppFilter:[],
+      truppView:'grid', truppFilter:[], truppPos:[],
       defaults:Object.assign({},DEFAULT_PARAMS), lastTraining:null }
   };
 }
@@ -883,6 +886,7 @@ function normalizeRoot(d){
   // Urval sparades tidigare som ett enda värde ('even'/1/2/3) – normalisera
   // till listform så flera nivåer kan väljas samtidigt.
   d.settings.truppFilter=normSel(d.settings.truppFilter);
+  d.settings.truppPos=Array.isArray(d.settings.truppPos)?d.settings.truppPos.filter(x=>typeof x==='string'):[];
   if(d.settings.lastTraining) d.settings.lastTraining.serie=normSel(d.settings.lastTraining.serie);
   d.cups.forEach(c=>{ c.serie=normSel(c.serie); });
   d.history.forEach(h=>{ if('serie' in h) h.serie=normSel(h.serie); });
@@ -1199,11 +1203,11 @@ function renderTrupp(){
   $('truppRelations').classList.toggle('hidden',truppTab!=='relations');
   $('truppLevels').classList.toggle('hidden',truppTab!=='levels');
   const act=root.players.filter(p=>p.active).length;
-  const sel=normSel(S().truppFilter);
+  const sel=normSel(S().truppFilter), posSel=S().truppPos||[];
   if(!root.players.length) $('truppSub').textContent='Spelarregister, relationer och nivåer.';
-  else if(truppTab==='players'&&sel.length){
-    const shown=root.players.filter(p=>inSel(p,sel)).length;
-    $('truppSub').textContent='Visar '+serieLabel(sel).toLowerCase()+
+  else if(truppTab==='players'&&(sel.length||posSel.length)){
+    const shown=root.players.filter(p=>inSel(p,sel)&&inPosSel(p,posSel)).length;
+    $('truppSub').textContent='Visar '+filterLabel(sel,posSel)+
       ' · '+shown+' av '+root.players.length+' i truppen';
   }
   else $('truppSub').textContent=act+' aktiva spelare'+(root.players.length-act?' · '+(root.players.length-act)+' inaktiva':'');
@@ -1230,13 +1234,61 @@ function selChipRow(sel,counts){
       (n===null?'':'<span class="n">'+n+'</span>')+'</button>';
   }).join('');
 }
+// Positionsfilter. Bara positioner som faktiskt finns i truppen får en knapp,
+// så raden aldrig fylls av nollor. 'none' = spelare utan position.
+// Läsbar beskrivning av det aktiva filtret, t.ex. "nivå 2 · MV, M6".
+function filterLabel(tier,pos){
+  const parts=[];
+  if(normSel(tier).length) parts.push(serieLabel(tier).toLowerCase());
+  if(pos&&pos.length) parts.push(pos.map(c=>c==='none'?'utan position':c).join(', '));
+  return parts.join(' · ')||'hela truppen';
+}
+function inPosSel(p,sel){
+  if(!sel||!sel.length) return true;
+  return p.pos?sel.indexOf(p.pos)>=0:sel.indexOf('none')>=0;
+}
+function posChipOptions(){
+  const present={}; root.players.forEach(p=>{ if(p.pos) present[p.pos]=true; });
+  const order=POS_FULL.concat(POS_SIMPLE).map(x=>x[0]);
+  const codes=[];
+  order.forEach(c=>{ if(present[c]&&codes.indexOf(c)<0) codes.push(c); });
+  Object.keys(present).forEach(c=>{ if(codes.indexOf(c)<0) codes.push(c); });
+  const opts=[['all','Alla']].concat(codes.map(c=>[c,c]));
+  if(root.players.some(p=>!p.pos)) opts.push(['none','Utan pos']);
+  return opts;
+}
 function renderTruppFilter(){
-  const sel=S().truppFilter;
-  $('truppFilter').innerHTML=selChipRow(sel,val=>
-    root.players.filter(p=>inSel(p,val==='all'?[]:[val])).length);
-  $('truppFilter').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{
+  const tier=normSel(S().truppFilter), pos=S().truppPos||[];
+  // Antalen i varje grupp räknas med det andra filtret aktivt, så de stämmer.
+  let html='<span class="fb-lbl">Nivå</span>'+
+    selChipRow(tier,val=>root.players.filter(p=>
+      inSel(p,val==='all'?[]:[val])&&inPosSel(p,pos)).length);
+  const opts=posChipOptions();
+  if(opts.length>1){
+    html+='<span class="fb-lbl">Position</span>'+opts.map(([val,label])=>{
+      const on=val==='all'?!pos.length:pos.indexOf(val)>=0;
+      const n=root.players.filter(p=>
+        inPosSel(p,val==='all'?[]:[val])&&inSel(p,tier)).length;
+      return '<button class="fchip'+(on?' sel':'')+'" data-p="'+esc(val)+'">'+esc(label)+
+        '<span class="n">'+n+'</span></button>';
+    }).join('');
+  }
+  const bar=$('truppFilter');
+  bar.innerHTML=html;
+  bar.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{
     const v=b.dataset.f;
     S().truppFilter=toggleSel(S().truppFilter,v==='all'?'all':(v==='none'?'none':parseInt(v,10)));
+    save(); renderTrupp();
+  });
+  bar.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{
+    const v=b.dataset.p;
+    const cur=(S().truppPos||[]).slice();
+    if(v==='all') S().truppPos=[];
+    else {
+      const i=cur.indexOf(v);
+      if(i>=0) cur.splice(i,1); else cur.push(v);
+      S().truppPos=cur;
+    }
     save(); renderTrupp();
   });
 }
@@ -1247,14 +1299,17 @@ function renderPlayers(){
   document.querySelectorAll('#truppViewSeg .segbtn').forEach(b=>
     b.classList.toggle('sel',b.dataset.view===(listMode?'list':'grid')));
   renderTruppFilter();
-  const sel=normSel(S().truppFilter);
-  const ps=root.players.filter(p=>inSel(p,sel))
+  const sel=normSel(S().truppFilter), posSel=S().truppPos||[];
+  const ps=root.players.filter(p=>inSel(p,sel)&&inPosSel(p,posSel))
     .sort((a,b)=>(b.active-a.active)||a.name.localeCompare(b.name,'sv'));
   if(!ps.length){
-    g.innerHTML='<div class="empty">'+(root.players.length
-      ?(sel.length===1&&sel[0]==='none'?'Alla spelare har en serienivå.'
-        :'Ingen spelare i urvalet '+serieLabel(sel)+'. Sätt serienivå i spelarens kort.')
-      :'Inga spelare ännu. Tryck ”+ Lägg till spelare”.')+'</div>';
+    let msg;
+    if(!root.players.length) msg='Inga spelare ännu. Tryck ”+ Lägg till spelare”.';
+    // Kvitto när högen med osatta är avbetad.
+    else if(!posSel.length&&sel.length===1&&sel[0]==='none') msg='Alla spelare har en serienivå.';
+    else if(!sel.length&&posSel.length===1&&posSel[0]==='none') msg='Alla spelare har en position.';
+    else msg='Ingen spelare matchar '+filterLabel(sel,posSel)+'.';
+    g.innerHTML='<div class="empty">'+esc(msg)+'</div>';
     return;
   }
   g.innerHTML=ps.map(p=>{
@@ -1457,7 +1512,7 @@ $('pasteSquadBtn').onclick=()=>{
       hand:c.hand||'H',color:PLAYER_COLORS[(root.players.length+i)%PLAYER_COLORS.length],
       photo:null,active:true,level:null,levelUpdated:null,def:null,defUpdated:null,note:''
     }));
-    S().truppFilter=[];   // visa hela truppen så de nya syns
+    S().truppFilter=[]; S().truppPos=[];   // visa hela truppen så de nya syns
     save(); closeModal(); renderTrupp();
     toast(fresh.length+' spelare tillagda');
   };
@@ -1582,6 +1637,7 @@ function openPlayerEditor(pid){
       root.players.push(np);
       // Ett aktivt filter får inte gömma spelaren som just lades till.
       if(!inSel(np,S().truppFilter)) S().truppFilter=[];
+      if(!inPosSel(np,S().truppPos)) S().truppPos=[];
     }
     save(); closeModal(); renderTrupp();
   };
