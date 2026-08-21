@@ -1,2 +1,5 @@
 __pycache__/
 *.pyc
+
+# Genereras av build.py enbart för Artifact-publicering
+preview/
