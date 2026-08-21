@@ -296,6 +296,15 @@
   .lvlrow .who { font-size: 15px; font-weight: 600; flex: 1; min-width: 0; white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; }
   .lvlrow .stale { font-size: 11px; color: var(--accent-2); font-weight: 700; flex-shrink: 0; }
+  .lvlrow2 { background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow);
+    padding: 12px 16px; margin-bottom: 8px; }
+  .lvl-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .lvl-head .who { font-size: 15px; font-weight: 700; flex: 1; min-width: 0; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .lvl-line { display: flex; align-items: center; gap: 12px; margin-bottom: 5px; }
+  .lvl-line:last-child { margin-bottom: 0; }
+  .lvl-lbl2 { font-size: 11px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase;
+    letter-spacing: 0.05em; width: 74px; flex-shrink: 0; }
   .lvlbtns { display: flex; gap: 3px; flex-shrink: 0; }
   .lvlbtn { width: 34px; height: 38px; background: var(--panel-2); color: var(--ink-dim);
     border: 1px solid var(--line); font-size: 15px; font-weight: 700; transition: var(--tap);
@@ -304,7 +313,10 @@
   .lvlbtn.sel { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
   /* Graderingsväljare i spelardialogen */
   .lvlpick { display: grid; grid-template-columns: repeat(10,1fr); gap: 3px; }
+  .lvlpick.def { grid-template-columns: repeat(5,1fr); }
   .lvlpick .lvlbtn { width: 100%; }
+  .lvl-sub { font-size: 11px; font-weight: 700; color: var(--ink-dim); text-transform: uppercase;
+    letter-spacing: 0.05em; margin-bottom: 6px; }
   .lvl-locked { display: flex; align-items: center; gap: 11px; background: var(--panel-2);
     border: 1px solid var(--line); padding: 12px 14px; font-size: 13.5px; color: var(--ink-dim); }
   .lvl-locked svg { width: 16px; height: 16px; flex-shrink: 0; }
@@ -744,10 +756,11 @@ const PARAM_DEFS=[
   ['gk','Minst en målvakt per {N}',''],
   ['pos','Sprid positioner',''],
   ['rel','Ta hänsyn till relationer',''],
+  ['defbal','Jämna försvar','Kräver försvarssiffror'],
   ['left','Sprid vänsterhänta',''],
   ['vary','Variera mot förra gången','Kräver historik']
 ];
-const DEFAULT_PARAMS={balance:true,gk:true,pos:true,rel:true,left:false,vary:false};
+const DEFAULT_PARAMS={balance:true,gk:true,pos:true,rel:true,defbal:true,left:false,vary:false};
 // Serienivå: vilken nivå i seriesystemet spelaren tillhör. Neutral fakta,
 // inte en bedömning – visas öppet och följer med i truppdelning.
 const SERIES=[1,2,3];
@@ -784,6 +797,9 @@ function serieLabel(sel){
 // Gradering: en enda dold siffra 1–10. Osatt gradering räknas som mitten.
 const LEVELS=[1,2,3,4,5,6,7,8,9,10];
 const LEVEL_MID=5.5;
+// Försvar: egen dold siffra 1–5, samma PIN-skydd som graderingen.
+const DEF_LEVELS=[1,2,3,4,5];
+const DEF_MID=3;
 const DATA_VERSION=3;   // 1 = gradering 1–5, 2 = gradering 1–10, 3 = kantpositioner borttagna
 
 /* ---------- IndexedDB storage layer ---------- */
@@ -829,7 +845,7 @@ function idbClear(){
 function freshRoot(){
   return {
     version:DATA_VERSION, onboarded:false, squadName:'',
-    players:[],      // {id,name,pos,pos2,serie,hand,color,photo,active,level,levelUpdated,note}
+    players:[],      // {id,name,pos,pos2,serie,hand,color,photo,active,level,levelUpdated,def,defUpdated,note}
     relations:[],    // {id,a,b,type:'good'|'vary'|'lock'}
     history:[],      // {id,ts,type,label,teams:[{name,vestId,players:[{id,name}]}]}
     cups:[],         // {id,name,date,numTeams,params,presentIds,teams}
@@ -1036,6 +1052,7 @@ function computeDivision(players,T,opts){
 
   // Steg A — snake draft: sortera på nivå (eller slumpa), dela ut i ormmönster
   const lvl=p=>p.level||LEVEL_MID;
+  const dlvl=p=>p.def||DEF_MID;
   const gAvg=g=>g.reduce((s,p)=>s+lvl(p),0)/g.length;
   if(P.balance){ groups.sort((a,b)=> b.length-a.length || (gAvg(b)+Math.random()*0.05)-(gAvg(a)+Math.random()*0.05)); }
   else { shuffle(groups); groups.sort((a,b)=>b.length-a.length); }
@@ -1065,6 +1082,7 @@ function computeDivision(players,T,opts){
   const totalGK=players.filter(p=>p.pos==='MV'||p.pos2==='MV').length;
   const posTot={}; players.forEach(p=>{ if(p.pos) posTot[p.pos]=(posTot[p.pos]||0)+1; });
   const totLeft=players.filter(p=>p.hand==='V').length;
+  const anyDef=players.some(p=>typeof p.def==='number');
 
   function costOf(tms){
     let c=0;
@@ -1085,6 +1103,12 @@ function computeDivision(players,T,opts){
       const avgs=tms.map(t=>t.length?t.reduce((s,p)=>s+lvl(p),0)/t.length:0);
       const g=avgs.reduce((a,b)=>a+b,0)/T;
       c+=avgs.reduce((s,a)=>s+(a-g)*(a-g),0)*800;
+    }
+    // jämna försvar – egen skala 1–5, därför lättare vikt än graderingen
+    if(P.defbal&&anyDef){
+      const davg=tms.map(t=>t.length?t.reduce((s,p)=>s+dlvl(p),0)/t.length:0);
+      const g=davg.reduce((a,b)=>a+b,0)/T;
+      c+=davg.reduce((s,a)=>s+(a-g)*(a-g),0)*800;
     }
     // positionsspridning
     if(P.pos){
@@ -1125,7 +1149,8 @@ function computeDivision(players,T,opts){
     else { const t2=ta[i]; ta[i]=tb[j]; tb[j]=t2; }
   }
   const avgs=teams.map(t=>t.length?t.reduce((s,p)=>s+lvl(p),0)/t.length:0);
-  return { teams:teams.map(t=>t.map(p=>p.id)), cost:cur, avgs };
+  const davgs=anyDef?teams.map(t=>t.length?t.reduce((s,p)=>s+dlvl(p),0)/t.length:0):null;
+  return { teams:teams.map(t=>t.map(p=>p.id)), cost:cur, avgs, davgs };
 }
 /*ALGO-END*/
 
@@ -1421,7 +1446,7 @@ $('pasteSquadBtn').onclick=()=>{
     fresh.forEach((c,i)=>root.players.push({
       id:uid(),name:c.name,pos:c.pos||null,pos2:null,serie:c.serie||null,
       hand:c.hand||'H',color:PLAYER_COLORS[(root.players.length+i)%PLAYER_COLORS.length],
-      photo:null,active:true,level:null,levelUpdated:null,note:''
+      photo:null,active:true,level:null,levelUpdated:null,def:null,defUpdated:null,note:''
     }));
     S().truppFilter=[];   // visa hela truppen så de nya syns
     save(); closeModal(); renderTrupp();
@@ -1445,7 +1470,7 @@ function openPlayerEditor(pid){
     '<label class="fld">Hänthet</label><div class="seg block" id="peHand">'+
       '<button class="segbtn'+(!p||p.hand!=='V'?' sel':'')+'" data-h="H">Högerhänt</button>'+
       '<button class="segbtn'+(p&&p.hand==='V'?' sel':'')+'" data-h="V">Vänsterhänt</button></div>'+
-    '<label class="fld">Gradering</label><div id="peLevelBox" style="margin-bottom:13px"></div>'+
+    '<label class="fld">Bedömning</label><div id="peLevelBox" style="margin-bottom:13px"></div>'+
     '<label class="fld">Färgprick</label><div class="swatches" id="peColors">'+
       PLAYER_COLORS.map(c=>'<button class="swatch'+((p?p.color:PLAYER_COLORS[0])===c?' sel':'')+'" data-c="'+c+'" style="background:'+c+'"></button>').join('')+'</div>'+
     '<label class="fld">Foto (frivilligt)</label>'+
@@ -1466,28 +1491,39 @@ function openPlayerEditor(pid){
   let hand=p?(p.hand||'H'):'H';
   let serie=p?(p.serie||null):null;
   let level=p?(p.level||null):null;
+  let def=p?(p.def||null):null;
   w.querySelectorAll('#peSerie .segbtn').forEach(b=>b.onclick=()=>{
     serie=b.dataset.s?parseInt(b.dataset.s,10):null;
     w.querySelectorAll('#peSerie .segbtn').forEach(x=>x.classList.toggle('sel',x===b));
   });
-  // Graderingen följer samma PIN-skydd som nivåfliken.
+  // Både gradering och försvar följer samma PIN-skydd som nivåfliken.
   function paintLevel(){
     const box=w.querySelector('#peLevelBox');
     if(S().pinHash&&!pinUnlocked){
       box.innerHTML='<div class="lvl-locked"><span data-svg="lockClosed"></span>'+
-        '<span class="lvl-lbl">Graderingen är PIN-skyddad.</span>'+
+        '<span class="lvl-lbl">Gradering och försvar är PIN-skyddat.</span>'+
         '<button class="minibtn" id="peLvlUnlock">Lås upp</button></div>';
       fillSvg(box);
       box.querySelector('#peLvlUnlock').onclick=()=>requirePin(()=>paintLevel());
       return;
     }
-    box.innerHTML='<div class="lvlpick">'+LEVELS.map(n=>'<button class="lvlbtn'+(level===n?' sel':'')+
+    box.innerHTML='<div class="lvl-sub">Gradering 1–10</div>'+
+      '<div class="lvlpick">'+LEVELS.map(n=>'<button class="lvlbtn'+(level===n?' sel':'')+
       '" data-lvl="'+n+'">'+n+'</button>').join('')+'</div>'+
       '<div class="lvl-scale"><span>1 · utvecklas</span><span>10 · bärande</span></div>'+
-      '<p class="hint" style="margin-top:6px">Grov helhetsbedömning. Används bara av algoritmen och visas aldrig i resultat, utskrifter eller exporter. Tryck på samma siffra igen för att rensa.</p>';
-    box.querySelectorAll('.lvlbtn').forEach(b=>b.onclick=()=>{
+      '<div class="lvl-sub" style="margin-top:12px">Försvar 1–5</div>'+
+      '<div class="lvlpick def">'+DEF_LEVELS.map(n=>'<button class="lvlbtn'+(def===n?' sel':'')+
+      '" data-def="'+n+'">'+n+'</button>').join('')+'</div>'+
+      '<div class="lvl-scale"><span>1 · utvecklas</span><span>5 · bärande</span></div>'+
+      '<p class="hint" style="margin-top:8px">Grova helhetsbedömningar. Används bara av algoritmen och visas aldrig i resultat, utskrifter eller exporter. Tryck på samma siffra igen för att rensa.</p>';
+    box.querySelectorAll('[data-lvl]').forEach(b=>b.onclick=()=>{
       const n=parseInt(b.dataset.lvl,10);
       level=(level===n)?null:n;
+      paintLevel();
+    });
+    box.querySelectorAll('[data-def]').forEach(b=>b.onclick=()=>{
+      const n=parseInt(b.dataset.def,10);
+      def=(def===n)?null:n;
       paintLevel();
     });
   }
@@ -1530,8 +1566,10 @@ function openPlayerEditor(pid){
     if(p){
       Object.assign(p,data);
       if(level!==(p.level||null)){ p.level=level; p.levelUpdated=level==null?null:Date.now(); }
+      if(def!==(p.def||null)){ p.def=def; p.defUpdated=def==null?null:Date.now(); }
     } else {
-      const np=Object.assign({id:uid(),level,levelUpdated:level==null?null:Date.now()},data);
+      const np=Object.assign({id:uid(),level,levelUpdated:level==null?null:Date.now(),
+        def,defUpdated:def==null?null:Date.now()},data);
       root.players.push(np);
       // Ett aktivt filter får inte gömma spelaren som just lades till.
       if(!inSel(np,S().truppFilter)) S().truppFilter=[];
@@ -1586,7 +1624,7 @@ function renderLevels(){
   const box=$('truppLevels');
   if(!pinUnlocked){
     box.innerHTML='<div class="lockedbox"><div class="big-ic" data-svg="lockClosed"></div>'+
-      '<p>Nivåfliken är PIN-skyddad. Graderingen är en grov helhetsbedömning (1–10) som bara används av algoritmen – den visas aldrig i resultat, utskrifter eller exporter.</p>'+
+      '<p>Nivåfliken är PIN-skyddad. Gradering (1–10) och försvar (1–5) är grova helhetsbedömningar som bara används av algoritmen – de visas aldrig i resultat, utskrifter eller exporter.</p>'+
       '<button class="primary" id="lvlUnlock">Lås upp</button></div>';
     fillSvg(box);
     $('lvlUnlock').onclick=()=>requirePin(()=>renderTrupp());
@@ -1594,7 +1632,10 @@ function renderLevels(){
   }
   const ps=root.players.filter(p=>p.active).sort((a,b)=>a.name.localeCompare(b.name,'sv'));
   const staleM=S().staleMonths||3;
-  const staleCnt=ps.filter(p=>!p.level||monthsSince(p.levelUpdated)>=staleM).length;
+  // Färskvara: osatt gradering, eller någon av siffrorna för gammal.
+  const isStale=p=>!p.level||monthsSince(p.levelUpdated)>=staleM||
+    (p.def&&monthsSince(p.defUpdated)>=staleM);
+  const staleCnt=ps.filter(isStale).length;
   let html='<div class="result-bar"><div class="left">'+
     (staleCnt?'<span class="pill warn">'+staleCnt+' behöver uppdateras</span>':'<span class="pill good">Alla nivåer aktuella</span>')+
     '</div><div class="right"><button class="topbtn" id="lvlLock"><span data-svg="lockOpen"></span> Lås</button></div></div>';
@@ -1602,18 +1643,31 @@ function renderLevels(){
     let stale='';
     if(!p.level) stale='<span class="stale">Ej satt</span>';
     else if(monthsSince(p.levelUpdated)>=staleM) stale='<span class="stale">'+Math.floor(monthsSince(p.levelUpdated))+' mån sedan</span>';
-    return '<div class="lvlrow"><div class="who">'+esc(p.name)+'</div>'+stale+
-      '<div class="lvlbtns">'+LEVELS.map(n=>'<button class="lvlbtn'+(p.level===n?' sel':'')+'" data-pid="'+p.id+'" data-lvl="'+n+'">'+n+'</button>').join('')+'</div></div>';
+    return '<div class="lvlrow2">'+
+      '<div class="lvl-head"><span class="who">'+esc(p.name)+'</span>'+stale+'</div>'+
+      '<div class="lvl-line"><span class="lvl-lbl2">Gradering</span><div class="lvlbtns">'+
+        LEVELS.map(n=>'<button class="lvlbtn'+(p.level===n?' sel':'')+'" data-pid="'+p.id+'" data-lvl="'+n+'">'+n+'</button>').join('')+
+      '</div></div>'+
+      '<div class="lvl-line"><span class="lvl-lbl2">Försvar</span><div class="lvlbtns">'+
+        DEF_LEVELS.map(n=>'<button class="lvlbtn'+(p.def===n?' sel':'')+'" data-pid="'+p.id+'" data-def="'+n+'">'+n+'</button>').join('')+
+      '</div></div></div>';
   }).join('');
   if(!ps.length) html+='<div class="empty">Inga aktiva spelare.</div>';
   box.innerHTML=html;
   fillSvg(box);
   $('lvlLock').onclick=()=>{ pinUnlocked=false; truppTab='players'; renderTrupp(); };
-  box.querySelectorAll('.lvlbtn').forEach(b=>b.onclick=()=>{
+  box.querySelectorAll('[data-lvl]').forEach(b=>b.onclick=()=>{
     const p=pById(b.dataset.pid); if(!p) return;
     const n=parseInt(b.dataset.lvl,10);
     if(p.level===n){ p.level=null; p.levelUpdated=null; }   // tryck igen för att rensa
     else { p.level=n; p.levelUpdated=Date.now(); }
+    save(); renderLevels();
+  });
+  box.querySelectorAll('[data-def]').forEach(b=>b.onclick=()=>{
+    const p=pById(b.dataset.pid); if(!p) return;
+    const n=parseInt(b.dataset.def,10);
+    if(p.def===n){ p.def=null; p.defUpdated=null; }
+    else { p.def=n; p.defUpdated=Date.now(); }
     save(); renderLevels();
   });
 }
@@ -1736,8 +1790,9 @@ $('openGroupSetup').onclick=()=>{
     refresh();
   };
   const box=w.querySelector('#paramSwitches');
+  const anyDef=root.players.some(p=>typeof p.def==='number');
   PARAM_DEFS.forEach(([key,label,hint])=>{
-    const disabled=(key==='vary'&&!root.history.length);
+    const disabled=(key==='vary'&&!root.history.length)||(key==='defbal'&&!anyDef);
     box.appendChild(switchRow(label.replace('{N}','grupp'),hint,!!P[key]&&!disabled,v=>{ P[key]=v; },disabled));
   });
   w.querySelector('#gsCancel').onclick=closeModal;
@@ -1763,7 +1818,7 @@ function runTrainingDivision(fresh){
       vestId:(!fresh&&prev&&prev.teams[i])?prev.teams[i].vestId:VESTS[i%VESTS.length].id,
       playerIds:ids
     })),
-    avgs:res.avgs
+    avgs:res.avgs, davgs:res.davgs
   };
   if(fresh) training.historyId=null;
   saveTrainingHistory();
@@ -1809,8 +1864,14 @@ function renderTrainResult(){
     const mx=Math.max(...r.avgs),mn=Math.min(...r.avgs);
     const d=mx-mn;
     note.classList.remove('hidden');
-    note.innerHTML='Nivåsnitt: '+r.avgs.map(a=>a.toFixed(1)).join(' · ')+
+    let html='Nivåsnitt: '+r.avgs.map(a=>a.toFixed(1)).join(' · ')+
       ' &nbsp;—&nbsp; <b class="'+(d<=1?'ok':'meh')+'">'+(d<=1?'Balans OK':'Skillnad '+d.toFixed(1))+'</b>';
+    if(r.davgs){
+      const dd=Math.max.apply(null,r.davgs)-Math.min.apply(null,r.davgs);
+      html+='<br>Försvarssnitt: '+r.davgs.map(a=>a.toFixed(1)).join(' · ')+
+        ' &nbsp;—&nbsp; <b class="'+(dd<=0.5?'ok':'meh')+'">'+(dd<=0.5?'Balans OK':'Skillnad '+dd.toFixed(1))+'</b>';
+    }
+    note.innerHTML=html;
   } else note.classList.add('hidden');
   // temporära lås
   const bar=$('templockBar');
@@ -1824,10 +1885,13 @@ function renderTrainResult(){
   });
 }
 function recomputeAvgs(r){
-  r.avgs=r.teams.map(t=>{
-    const ls=t.playerIds.map(id=>{ const p=pById(id); return p?(p.level||LEVEL_MID):LEVEL_MID; });
-    return ls.length?ls.reduce((a,b)=>a+b,0)/ls.length:0;
-  });
+  const mean=(ids,pick)=>{
+    const v=ids.map(id=>{ const p=pById(id); return p?pick(p):null; }).filter(x=>x!==null);
+    return v.length?v.reduce((a,b)=>a+b,0)/v.length:0;
+  };
+  r.avgs=r.teams.map(t=>mean(t.playerIds,p=>p.level||LEVEL_MID));
+  const anyDef=root.players.some(p=>typeof p.def==='number');
+  r.davgs=anyDef?r.teams.map(t=>mean(t.playerIds,p=>p.def||DEF_MID)):null;
 }
 $('trainBack').onclick=()=>{ training.phase='setup'; renderTraining(); };
 $('reshuffleBtn').onclick=()=>{ runTrainingDivision(false); renderTrainResult(); };
