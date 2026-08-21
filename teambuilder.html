@@ -527,43 +527,25 @@
     <div id="trainSetup">
       <div class="head-row">
         <div><h2><span class="h2-icon" data-svg="whistle"></span>Träning</h2>
-          <p class="sub">Närvaro → inställningar → dela in. Klart på under en minut.</p></div>
-      </div>
-      <div class="setup-grid">
-        <div>
-          <label class="fld">Urval</label>
-          <div class="filterbar" id="serieSeg"></div>
-          <div class="att-head">
-            <div class="att-count" id="attCount"></div>
-            <div style="display:flex;gap:8px">
-              <button class="minibtn" id="attAll">Alla</button>
-              <button class="minibtn" id="attNone">Ingen</button>
-            </div>
-          </div>
-          <div class="tilegrid" id="attGrid"></div>
-        </div>
-        <div class="card">
-          <h3>Antal lag</h3>
-          <div class="seg block" id="teamCountSeg">
-            <button class="segbtn" data-n="2">2</button>
-            <button class="segbtn" data-n="3">3</button>
-            <button class="segbtn" data-n="4">4</button>
-            <button class="segbtn" data-n="custom">Eget</button>
-            <button class="segbtn" data-n="size">Lag om …</button>
-          </div>
-          <div id="customCountBox" class="hidden">
-            <label class="fld" id="customCountLbl">Antal lag</label>
-            <input id="customCountInput" type="number" inputmode="numeric" min="2" max="12" value="5">
-          </div>
-          <h3 style="margin-top:18px">Parametrar</h3>
-          <div id="paramSwitches"></div>
-          <button class="primary block" id="divideBtn" data-svg-after="">Dela in</button>
+          <p class="sub">Bocka i vilka som är på plats och skapa dagens grupper.</p></div>
+        <div class="head-actions">
+          <button class="primary" id="openGroupSetup">Skapa träningsgrupper</button>
         </div>
       </div>
+      <label class="fld">Urval</label>
+      <div class="filterbar" id="serieSeg"></div>
+      <div class="att-head">
+        <div class="att-count" id="attCount"></div>
+        <div style="display:flex;gap:8px">
+          <button class="minibtn" id="attAll">Alla</button>
+          <button class="minibtn" id="attNone">Ingen</button>
+        </div>
+      </div>
+      <div class="tilegrid" id="attGrid"></div>
     </div>
     <div id="trainResult" class="hidden">
       <div class="head-row">
-        <div><h2><span class="h2-icon" data-svg="whistle"></span>Dagens lag</h2>
+        <div><h2><span class="h2-icon" data-svg="whistle"></span>Träningsgrupper</h2>
           <p class="sub" id="trainResultSub"></p></div>
       </div>
       <div class="result-bar">
@@ -579,7 +561,7 @@
       <div class="teams-grid" id="trainTeams"></div>
       <div class="balance-note hidden" id="balanceNote"></div>
       <div class="templock-bar" id="templockBar"></div>
-      <p class="hint">Dra en spelare till ett annat lag för att justera. Långtryck på två spelare för att låsa ihop dem inför nästa omslumpning.</p>
+      <p class="hint">Dra en spelare till en annan grupp för att justera. Långtryck på två spelare för att låsa ihop dem inför nästa omslumpning.</p>
     </div>
   </div>
 
@@ -732,10 +714,12 @@ const VESTS=[
   {id:'lila',   name:'Lila',   bg:'#bf5af2', ink:'#ffffff'},
   {id:'svart',  name:'Svart',  bg:'#3a3a3c', ink:'#ffffff'}
 ];
+// Träning delar in i grupper, cup i lag – samma mekanik, olika ord.
+const TRAIN_PREFIX='Grupp ', CUP_PREFIX='Lag ';
 const PLAYER_COLORS=['#0a84ff','#30d158','#ff453a','#ffd60a','#ff9f0a','#bf5af2','#64d2ff','#ff6482','#98989f'];
 const PARAM_DEFS=[
   ['balance','Jämna nivåer','Av = ren slump'],
-  ['gk','Minst en målvakt per lag',''],
+  ['gk','Minst en målvakt per {N}',''],
   ['pos','Sprid positioner',''],
   ['rel','Ta hänsyn till relationer',''],
   ['left','Sprid vänsterhänta',''],
@@ -1486,50 +1470,75 @@ function renderTrainSetup(){
     if(training.present.has(id)) training.present.delete(id); else training.present.add(id);
     renderTrainSetup();
   });
-  // antal lag
-  document.querySelectorAll('#teamCountSeg .segbtn').forEach(b=>{
-    b.classList.toggle('sel',b.dataset.n===training.countMode);
-    b.onclick=()=>{ training.countMode=b.dataset.n; renderTrainSetup(); };
-  });
-  const cb=$('customCountBox');
-  if(training.countMode==='custom'){
-    cb.classList.remove('hidden'); $('customCountLbl').textContent='Antal lag';
-    $('customCountInput').value=training.customCount;
-    $('customCountInput').oninput=e=>{ training.customCount=parseInt(e.target.value,10)||2; updateDivideBtn(); };
-  } else if(training.countMode==='size'){
-    cb.classList.remove('hidden'); $('customCountLbl').textContent='Spelare per lag';
-    $('customCountInput').value=training.teamSize;
-    $('customCountInput').oninput=e=>{ training.teamSize=parseInt(e.target.value,10)||4; updateDivideBtn(); };
-  } else cb.classList.add('hidden');
-  // parametrar
-  const box=$('paramSwitches'); box.innerHTML='';
-  const P=trainingParams();
-  PARAM_DEFS.forEach(([key,label,hint])=>{
-    const disabled=(key==='vary'&&!root.history.length);
-    box.appendChild(switchRow(label,hint,!!P[key]&&!disabled,v=>{ P[key]=v; },disabled));
-  });
-  updateDivideBtn();
-}
-function updateDivideBtn(){
-  const n=presentEligibleIds().length, T=trainingT();
-  const btn=$('divideBtn');
-  btn.disabled=!(n>=2&&T>=2&&n>=T);
-  btn.textContent=n>=T&&n>=2?'Dela in '+n+' spelare i '+T+' lag':'Dela in';
+  $('openGroupSetup').disabled=presentEligibleIds().length<2;
 }
 // "Alla"/"Ingen" gäller det aktuella urvalet, inte hela truppen.
 $('attAll').onclick=()=>{ eligiblePlayers(training.serie).forEach(p=>training.present.add(p.id)); renderTrainSetup(); };
 $('attNone').onclick=()=>{ eligiblePlayers(training.serie).forEach(p=>training.present.delete(p.id)); renderTrainSetup(); };
 
-$('divideBtn').onclick=()=>{
-  const n=presentEligibleIds().length, T=trainingT();
-  if(n<2||n<T) return;
+/* Popup: antal grupper + parametrar, öppnas från "Skapa träningsgrupper". */
+$('openGroupSetup').onclick=()=>{
   const P=trainingParams();
-  S().lastTraining={params:Object.assign({},P),countMode:training.countMode,customCount:training.customCount,
-    teamSize:training.teamSize,serie:normSel(training.serie)};
-  training.tempLocks=[]; training.lockSel=null; training.showBalance=false;
-  runTrainingDivision(true);
-  training.phase='result';
-  save(); renderTraining();
+  const w=modal('<h2>Skapa träningsgrupper</h2>'+
+    '<p class="sub" id="gsPresent" style="margin-bottom:20px"></p>'+
+    '<label class="fld">Antal grupper</label>'+
+    '<div class="seg block" id="teamCountSeg">'+
+      '<button class="segbtn" data-n="2">2</button>'+
+      '<button class="segbtn" data-n="3">3</button>'+
+      '<button class="segbtn" data-n="4">4</button>'+
+      '<button class="segbtn" data-n="custom">Eget</button>'+
+      '<button class="segbtn" data-n="size">Grupper om …</button>'+
+    '</div>'+
+    '<div id="customCountBox" class="hidden">'+
+      '<label class="fld" id="customCountLbl">Antal grupper</label>'+
+      '<input id="customCountInput" type="number" inputmode="numeric" min="2" max="12" value="5">'+
+    '</div>'+
+    '<label class="fld" style="margin-top:18px">Parametrar</label>'+
+    '<div id="paramSwitches"></div>'+
+    '<div class="btnrow" style="margin-top:18px"><button class="ghost" id="gsCancel">Avbryt</button>'+
+      '<button class="primary" id="divideBtn">Dela in</button></div>',{sticky:true});
+  function refresh(){
+    const n=presentEligibleIds().length, T=trainingT();
+    w.querySelectorAll('#teamCountSeg .segbtn').forEach(b=>
+      b.classList.toggle('sel',b.dataset.n===training.countMode));
+    const cb=w.querySelector('#customCountBox');
+    if(training.countMode==='custom'){
+      cb.classList.remove('hidden'); w.querySelector('#customCountLbl').textContent='Antal grupper';
+      if(document.activeElement!==w.querySelector('#customCountInput')) w.querySelector('#customCountInput').value=training.customCount;
+    } else if(training.countMode==='size'){
+      cb.classList.remove('hidden'); w.querySelector('#customCountLbl').textContent='Spelare per grupp';
+      if(document.activeElement!==w.querySelector('#customCountInput')) w.querySelector('#customCountInput').value=training.teamSize;
+    } else cb.classList.add('hidden');
+    w.querySelector('#gsPresent').textContent=serieLabel(training.serie)+' · '+n+' spelare på plats';
+    const btn=w.querySelector('#divideBtn');
+    btn.disabled=!(n>=2&&T>=2&&n>=T);
+    btn.textContent=(n>=T&&n>=2)?'Dela in i '+T+' grupper':'Dela in';
+  }
+  w.querySelectorAll('#teamCountSeg .segbtn').forEach(b=>b.onclick=()=>{
+    training.countMode=b.dataset.n; refresh();
+  });
+  w.querySelector('#customCountInput').oninput=e=>{
+    const v=parseInt(e.target.value,10);
+    if(training.countMode==='size') training.teamSize=v||4; else training.customCount=v||2;
+    refresh();
+  };
+  const box=w.querySelector('#paramSwitches');
+  PARAM_DEFS.forEach(([key,label,hint])=>{
+    const disabled=(key==='vary'&&!root.history.length);
+    box.appendChild(switchRow(label.replace('{N}','grupp'),hint,!!P[key]&&!disabled,v=>{ P[key]=v; },disabled));
+  });
+  w.querySelector('#gsCancel').onclick=closeModal;
+  w.querySelector('#divideBtn').onclick=()=>{
+    const n=presentEligibleIds().length, T=trainingT();
+    if(n<2||n<T) return;
+    S().lastTraining={params:Object.assign({},P),countMode:training.countMode,customCount:training.customCount,
+      teamSize:training.teamSize,serie:normSel(training.serie)};
+    training.tempLocks=[]; training.lockSel=null; training.showBalance=false;
+    runTrainingDivision(true);
+    training.phase='result';
+    save(); closeModal(); renderTraining();
+  };
+  refresh();
 };
 function runTrainingDivision(fresh){
   const T=trainingT();
@@ -1537,7 +1546,7 @@ function runTrainingDivision(fresh){
   const prev=training.result;
   training.result={
     teams:res.teams.map((ids,i)=>({
-      name:(!fresh&&prev&&prev.teams[i])?prev.teams[i].name:'Lag '+VESTS[i%VESTS.length].name,
+      name:(!fresh&&prev&&prev.teams[i])?prev.teams[i].name:TRAIN_PREFIX+VESTS[i%VESTS.length].name,
       vestId:(!fresh&&prev&&prev.teams[i])?prev.teams[i].vestId:VESTS[i%VESTS.length].id,
       playerIds:ids
     })),
@@ -1550,7 +1559,7 @@ function saveTrainingHistory(){
   const r=training.result; if(!r) return;
   const entry={
     id:training.historyId||uid(), ts:Date.now(), type:'Träning', serie:normSel(training.serie),
-    label:r.teams.length+' lag · '+r.teams.reduce((s,t)=>s+t.playerIds.length,0)+' spelare',
+    label:r.teams.length+' grupper · '+r.teams.reduce((s,t)=>s+t.playerIds.length,0)+' spelare',
     teams:r.teams.map(t=>({name:t.name,vestId:t.vestId,
       players:t.playerIds.map(id=>{ const p=pById(id); return {id,name:p?p.name:'?'}; })}))
   };
@@ -1563,7 +1572,7 @@ function saveTrainingHistory(){
 function renderTrainResult(){
   const r=training.result; if(!r){ training.phase='setup'; renderTraining(); return; }
   const n=r.teams.reduce((s,t)=>s+t.playerIds.length,0);
-  $('trainResultSub').textContent=serieLabel(training.serie)+' · '+n+' spelare · '+r.teams.length+' lag · '+fmtDate(Date.now());
+  $('trainResultSub').textContent=serieLabel(training.serie)+' · '+n+' spelare · '+r.teams.length+' grupper · '+fmtDate(Date.now());
   renderTeamCards($('trainTeams'),r.teams,{
     onMove:(pid,from,to)=>{
       const src=r.teams[from], dst=r.teams[to];
@@ -1578,7 +1587,7 @@ function renderTrainResult(){
       }
     },
     lockSelRef:training,
-    onRename:(i)=>renameTeam(r.teams[i],()=>{ saveTrainingHistory(); renderTrainResult(); }),
+    onRename:(i)=>renameTeam(r.teams[i],()=>{ saveTrainingHistory(); renderTrainResult(); },'grupp'),
     onVest:(i)=>{ cycleVest(r.teams[i]); saveTrainingHistory(); renderTrainResult(); }
   });
   // balans (PIN-skyddad, diskret)
@@ -1683,8 +1692,8 @@ function bindChipPointer(chip,grid,handlers){
     chip.addEventListener('pointercancel',up);
   });
 }
-function renameTeam(team,done){
-  const w=modal('<h2>Lagnamn</h2><input id="tnIn" value="'+esc(team.name)+'" autocomplete="off">'+
+function renameTeam(team,done,noun){
+  const w=modal('<h2>'+(noun==='grupp'?'Gruppnamn':'Lagnamn')+'</h2><input id="tnIn" value="'+esc(team.name)+'" autocomplete="off">'+
     '<div class="btnrow"><button class="ghost" id="tnCancel">Avbryt</button><button class="primary" id="tnOk">Spara</button></div>');
   const inp=w.querySelector('#tnIn'); inp.focus(); inp.select();
   w.querySelector('#tnCancel').onclick=closeModal;
@@ -1695,9 +1704,10 @@ function renameTeam(team,done){
 function cycleVest(team){
   const i=VESTS.findIndex(v=>v.id===team.vestId);
   const nv=VESTS[(i+1)%VESTS.length];
-  const oldName='Lag '+vestById(team.vestId).name;
+  const old=vestById(team.vestId).name;
   team.vestId=nv.id;
-  if(team.name===oldName) team.name='Lag '+nv.name;
+  // Följ med i färgbytet så länge namnet inte är egensatt.
+  for(const pre of [TRAIN_PREFIX,CUP_PREFIX]) if(team.name===pre+old){ team.name=pre+nv.name; break; }
 }
 
 /* ---------- Utskrift (endast namn och lag – aldrig nivådata) ---------- */
@@ -1823,7 +1833,7 @@ function renderCupDetail(cup){
       .forEach(([key,label,hint])=>sw.appendChild(switchRow(label,hint,!!cup.params[key],v=>{ cup.params[key]=v; save(); })));
     $('cupGenerate').onclick=()=>{
       const res=makeTeams(cupEligibleIds(cup),cup.numTeams,cup.params,[]);
-      cup.teams=res.teams.map((ids,i)=>({name:'Lag '+VESTS[i%VESTS.length].name,vestId:VESTS[i%VESTS.length].id,playerIds:ids}));
+      cup.teams=res.teams.map((ids,i)=>({name:CUP_PREFIX+VESTS[i%VESTS.length].name,vestId:VESTS[i%VESTS.length].id,playerIds:ids}));
       cupHistory(cup); save(); renderCupDetail(cup);
     };
   } else {
@@ -1838,7 +1848,7 @@ function renderCupDetail(cup){
     });
     $('cupReshuffle').onclick=()=>confirmModal('Slumpa om lagen?','Nuvarande lag ersätts med en ny giltig indelning.','Slumpa om',()=>{
       const res=makeTeams(cupEligibleIds(cup),cup.teams.length,cup.params,[]);
-      cup.teams=res.teams.map((ids,i)=>({name:cup.teams[i]?cup.teams[i].name:'Lag '+VESTS[i%VESTS.length].name,
+      cup.teams=res.teams.map((ids,i)=>({name:cup.teams[i]?cup.teams[i].name:CUP_PREFIX+VESTS[i%VESTS.length].name,
         vestId:cup.teams[i]?cup.teams[i].vestId:VESTS[i%VESTS.length].id,playerIds:ids}));
       cupHistory(cup); save(); renderCupDetail(cup);
     });
@@ -1869,7 +1879,8 @@ function renderHistory(){
     '<summary><span class="hist-date">'+fmtDateShort(h.ts)+'</span>'+
     '<div class="hist-meta"><div class="hist-title">'+esc(h.type)+
     (h.type==='Cup'?' · '+esc(h.label):(normSel(h.serie).length?' · '+esc(serieLabel(h.serie)):''))+'</div>'+
-    '<div class="hist-sub">'+fmtDate(h.ts)+' · '+h.teams.length+' lag · '+h.teams.reduce((s,t)=>s+t.players.length,0)+' spelare</div></div>'+
+    '<div class="hist-sub">'+fmtDate(h.ts)+' · '+h.teams.length+(h.type==='Cup'?' lag · ':' grupper · ')+
+    h.teams.reduce((s,t)=>s+t.players.length,0)+' spelare</div></div>'+
     '<button class="cardDel" data-hid="'+h.id+'">✕</button></summary>'+
     '<div class="hist-body">'+h.teams.map(t=>{
       const v=vestById(t.vestId);
@@ -1898,7 +1909,7 @@ function renderSettings(){
   $('setPinBtn').textContent=S().pinHash?'Ändra PIN':'Sätt PIN';
   const box=$('defaultSwitches'); box.innerHTML='';
   PARAM_DEFS.forEach(([key,label,hint])=>{
-    box.appendChild(switchRow(label,hint,!!S().defaults[key],v=>{ S().defaults[key]=v; save(); }));
+    box.appendChild(switchRow(label.replace('{N}','lag/grupp'),hint,!!S().defaults[key],v=>{ S().defaults[key]=v; save(); }));
   });
 }
 $('setPinBtn').onclick=()=>{
