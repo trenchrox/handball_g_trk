@@ -248,6 +248,15 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .plistrow .pmeta { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; min-width: 0; }
   .plistrow.inactive { opacity: 0.45; }
+  /* ---------- Filterknappar (nivåer i truppvyn) ---------- */
+  .filterbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
+  .fchip { background: var(--panel-2); color: var(--ink-dim); border: 1px solid var(--line);
+    border-radius: 0; padding: 9px 14px; font-size: 12.5px; font-weight: 700; transition: var(--tap);
+    display: inline-flex; align-items: center; gap: 7px; }
+  .fchip:active { transform: scale(0.96); }
+  .fchip.sel { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .fchip .n { font-size: 11px; opacity: 0.65; font-variant-numeric: tabular-nums; }
+  .fchip.sel .n { opacity: 0.85; }
   .tabs .view-seg { margin-left: auto; }
   .view-seg .segbtn { padding: 9px 13px; display: inline-flex; align-items: center; }
   .view-seg .segbtn svg { width: 16px; height: 16px; display: block; }
@@ -493,6 +502,7 @@
         <button class="segbtn" data-view="list" title="Listvy" aria-label="Listvy"><span data-svg="listIc"></span></button>
       </div>
     </div>
+    <div class="filterbar" id="truppFilter"></div>
     <div id="truppPlayers" class="grid"></div>
     <div id="truppRelations" class="hidden">
       <div class="set-section">
@@ -792,7 +802,8 @@ function freshRoot(){
     relations:[],    // {id,a,b,type:'good'|'vary'|'lock'}
     history:[],      // {id,ts,type,label,teams:[{name,vestId,players:[{id,name}]}]}
     cups:[],         // {id,name,date,numTeams,params,presentIds,teams}
-    settings:{ pinHash:null, posMode:'full', staleMonths:3, theme:'dark', truppView:'grid',
+    settings:{ pinHash:null, posMode:'full', staleMonths:3, theme:'dark',
+      truppView:'grid', truppFilter:'all',
       defaults:Object.assign({},DEFAULT_PARAMS), lastTraining:null }
   };
 }
@@ -1106,11 +1117,19 @@ function renderTrupp(){
   renderNavCtx();
   document.querySelectorAll('#vTrupp .tab').forEach(t=>t.classList.toggle('sel',t.dataset.tab===truppTab));
   $('truppViewSeg').classList.toggle('hidden',truppTab!=='players');
+  $('truppFilter').classList.toggle('hidden',truppTab!=='players');
   $('truppPlayers').classList.toggle('hidden',truppTab!=='players');
   $('truppRelations').classList.toggle('hidden',truppTab!=='relations');
   $('truppLevels').classList.toggle('hidden',truppTab!=='levels');
   const act=root.players.filter(p=>p.active).length;
-  $('truppSub').textContent=root.players.length?act+' aktiva spelare'+(root.players.length-act?' · '+(root.players.length-act)+' inaktiva':''):'Spelarregister, relationer och nivåer.';
+  const f=S().truppFilter||'all';
+  if(!root.players.length) $('truppSub').textContent='Spelarregister, relationer och nivåer.';
+  else if(truppTab==='players'&&f!=='all'){
+    const shown=root.players.filter(p=>matchesFilter(p,f)).length;
+    $('truppSub').textContent='Visar '+(f==='none'?'spelare utan serienivå':'nivå '+f)+
+      ' · '+shown+' av '+root.players.length+' i truppen';
+  }
+  else $('truppSub').textContent=act+' aktiva spelare'+(root.players.length-act?' · '+(root.players.length-act)+' inaktiva':'');
   if(truppTab==='players') renderPlayers();
   else if(truppTab==='relations') renderRelations();
   else renderLevels();
@@ -1122,14 +1141,43 @@ function playerAvatar(p,cls){
 document.querySelectorAll('#truppViewSeg .segbtn').forEach(b=>b.onclick=()=>{
   S().truppView=b.dataset.view; save(); renderPlayers();
 });
+// Visningsfilter på serienivå. 'all' = hela truppen, 'none' = de utan nivå.
+function matchesFilter(p,f){
+  if(f==='all'||!f) return true;
+  if(f==='none') return !p.serie;
+  return p.serie===f;
+}
+function renderTruppFilter(){
+  const all=root.players;
+  const opts=[['all','Alla']].concat(SERIES.map(n=>[n,'Nivå '+n]),[['none','Utan nivå']]);
+  const f=S().truppFilter||'all';
+  $('truppFilter').innerHTML=opts.map(([val,label])=>{
+    const n=all.filter(p=>matchesFilter(p,val)).length;
+    return '<button class="fchip'+(val===f?' sel':'')+'" data-f="'+val+'">'+esc(label)+
+      '<span class="n">'+n+'</span></button>';
+  }).join('');
+  $('truppFilter').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{
+    const v=b.dataset.f;
+    S().truppFilter=(v==='all'||v==='none')?v:parseInt(v,10);
+    save(); renderTrupp();
+  });
+}
 function renderPlayers(){
   const g=$('truppPlayers');
   const listMode=S().truppView==='list';
   g.className=listMode?'plist':'grid';
   document.querySelectorAll('#truppViewSeg .segbtn').forEach(b=>
     b.classList.toggle('sel',b.dataset.view===(listMode?'list':'grid')));
-  const ps=root.players.slice().sort((a,b)=>(b.active-a.active)||a.name.localeCompare(b.name,'sv'));
-  if(!ps.length){ g.innerHTML='<div class="empty">Inga spelare ännu. Tryck ”+ Lägg till spelare”.</div>'; return; }
+  renderTruppFilter();
+  const f=S().truppFilter||'all';
+  const ps=root.players.filter(p=>matchesFilter(p,f))
+    .sort((a,b)=>(b.active-a.active)||a.name.localeCompare(b.name,'sv'));
+  if(!ps.length){
+    g.innerHTML='<div class="empty">'+(root.players.length
+      ?(f==='none'?'Alla spelare har en serienivå.':'Ingen spelare på nivå '+f+'. Sätt serienivå i spelarens kort.')
+      :'Inga spelare ännu. Tryck ”+ Lägg till spelare”.')+'</div>';
+    return;
+  }
   g.innerHTML=ps.map(p=>{
     const tags=[];
     if(p.serie) tags.push('<span class="postag serie">Nivå '+p.serie+'</span>');
@@ -1253,7 +1301,10 @@ function openPlayerEditor(pid){
       Object.assign(p,data);
       if(level!==(p.level||null)){ p.level=level; p.levelUpdated=level==null?null:Date.now(); }
     } else {
-      root.players.push(Object.assign({id:uid(),level,levelUpdated:level==null?null:Date.now()},data));
+      const np=Object.assign({id:uid(),level,levelUpdated:level==null?null:Date.now()},data);
+      root.players.push(np);
+      // Ett aktivt filter får inte gömma spelaren som just lades till.
+      if(!matchesFilter(np,S().truppFilter||'all')) S().truppFilter='all';
     }
     save(); closeModal(); renderTrupp();
   };
