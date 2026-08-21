@@ -104,6 +104,9 @@
   .navlink.active { background: var(--panel); color: var(--ink); box-shadow: var(--shadow); }
   .navlink.active .ic { color: var(--accent); }
   nav .spacer { flex: 1; }
+  /* PIN-låset: orange ikon när bedömningarna ligger öppna */
+  #navLock.unlocked { color: var(--ink); }
+  #navLock.unlocked .ic { color: var(--accent-2); }
   .app-version { text-align: center; font-size: 11px; color: var(--ink-faint); opacity: 0.5;
     padding: 8px 0 2px; letter-spacing: 0.03em; }
   nav .ctx { font-size: 12px; color: var(--ink-faint); padding: 14px 15px 0; line-height: 1.6;
@@ -265,10 +268,11 @@
   .pastesum .names { color: var(--ink-dim); margin-top: 6px; font-size: 12.5px; }
 
   /* ---------- Filterknappar (nivåer i truppvyn) ---------- */
-  .filterbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; align-items: center; }
+  .filterbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; align-items: center; }
+  .filterbar:last-of-type { margin-bottom: 18px; }
+  #truppPosFilter { margin-bottom: 18px; }
   .fb-lbl { font-size: 10px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase;
-    letter-spacing: 0.1em; margin-right: 2px; }
-  .fb-lbl:not(:first-child) { margin-left: 14px; padding-left: 14px; border-left: 1px solid var(--line-2); }
+    letter-spacing: 0.1em; width: 58px; flex-shrink: 0; }
   .fchip { background: var(--panel-2); color: var(--ink-dim); border: 1px solid var(--line);
     border-radius: 0; padding: 9px 14px; font-size: 12.5px; font-weight: 700; transition: var(--tap);
     display: inline-flex; align-items: center; gap: 7px; }
@@ -516,6 +520,7 @@
   <button class="navlink" data-nav="vHistory"><span class="ic" data-svg="clock"></span>Historik</button>
   <button class="navlink" data-nav="vSettings"><span class="ic" data-svg="gear"></span>Inställningar</button>
   <div class="spacer"></div>
+  <button class="navlink" id="navLock"><span class="ic" id="navLockIc"></span><span id="navLockLabel">Lås upp</span></button>
   <button class="navlink" id="themeToggle"><span class="ic" id="themeIcon">☾</span><span id="themeLabel">Mörkt läge</span></button>
   <div class="ctx" id="navCtx"></div>
   <div class="app-version">Teambuilder v0.2</div>
@@ -543,6 +548,7 @@
       </div>
     </div>
     <div class="filterbar" id="truppFilter"></div>
+    <div class="filterbar" id="truppPosFilter"></div>
     <div id="truppPlayers" class="grid"></div>
     <div id="truppRelations" class="hidden">
       <div class="set-section">
@@ -953,6 +959,18 @@ function confirmModal(title,text,okLabel,cb,danger){
 
 /* ---------- PIN ---------- */
 let pinUnlocked=false;
+// All ändring av låsstatus går via setUnlocked, så menyknappen och den öppna
+// vyn alltid speglar verkligheten.
+function setUnlocked(v){ pinUnlocked=!!v; renderNavLock(); }
+function renderNavLock(){
+  const btn=$('navLock'); if(!btn) return;
+  const has=!!S().pinHash;
+  const state=!has?'set':(pinUnlocked?'unlocked':'locked');
+  btn.classList.toggle('unlocked',state==='unlocked');
+  $('navLockIc').innerHTML=SVG[state==='locked'?'lockClosed':'lockOpen'];
+  $('navLockLabel').textContent=state==='set'?'Sätt PIN':(state==='unlocked'?'Lås':'Lås upp');
+  btn.title=state==='unlocked'?'Bedömningar är upplåsta':'';
+}
 async function hashPin(pin){
   const s='tb:'+pin;
   try{
@@ -985,7 +1003,7 @@ function requirePin(cb){
       const a=w.querySelector('#pinNew').value, b=w.querySelector('#pinNew2').value;
       if(!validPinFormat(a)){ toast('PIN måste vara 4–6 siffror'); return; }
       if(a!==b){ toast('PIN-koderna matchar inte'); return; }
-      S().pinHash=await hashPin(a); save(); pinUnlocked=true; closeModal(); cb();
+      S().pinHash=await hashPin(a); save(); setUnlocked(true); closeModal(); cb();
     };
     return;
   }
@@ -995,7 +1013,7 @@ function requirePin(cb){
   const inp=w.querySelector('#pinIn'); inp.focus();
   w.querySelector('#pinCancel').onclick=closeModal;
   const go=async()=>{
-    if(await verifyPin(inp.value)){ pinUnlocked=true; closeModal(); cb(); }
+    if(await verifyPin(inp.value)){ setUnlocked(true); closeModal(); cb(); }
     else { toast('Fel PIN'); inp.value=''; inp.focus(); }
   };
   w.querySelector('#pinOk').onclick=go;
@@ -1004,7 +1022,10 @@ function requirePin(cb){
 
 /* ---------- Navigation & tema ---------- */
 const VIEWS=['vTrupp','vTraining','vCup','vHistory','vSettings'];
+let curView='vTrupp';
+function refreshView(){ show(curView); }
 function show(id){
+  curView=id;
   VIEWS.forEach(v=>$(v).classList.toggle('hidden',v!==id));
   document.querySelectorAll('.navlink[data-nav]').forEach(n=>n.classList.toggle('active',n.dataset.nav===id));
   if(id==='vTrupp') renderTrupp();
@@ -1021,6 +1042,15 @@ function applyTheme(){
   $('themeLabel').textContent=light?'Ljust läge':'Mörkt läge';
 }
 $('themeToggle').onclick=()=>{ S().theme=(S().theme==='light'?'dark':'light'); save(); applyTheme(); };
+// Låset i menyn: alltid nåbart, oavsett vilken vy man står i.
+$('navLock').onclick=()=>{
+  if(!S().pinHash){                       // ingen PIN satt än – skapa en
+    requirePin(()=>{ renderNavLock(); refreshView(); });
+    return;
+  }
+  if(pinUnlocked){ setUnlocked(false); refreshView(); toast('Låst'); }
+  else requirePin(()=>{ refreshView(); });
+};
 function renderNavCtx(){
   const act=root.players.filter(p=>p.active).length;
   const inact=root.players.length-act;
@@ -1199,6 +1229,7 @@ function renderTrupp(){
   document.querySelectorAll('#vTrupp .tab').forEach(t=>t.classList.toggle('sel',t.dataset.tab===truppTab));
   $('truppViewSeg').classList.toggle('hidden',truppTab!=='players');
   $('truppFilter').classList.toggle('hidden',truppTab!=='players');
+  $('truppPosFilter').classList.toggle('hidden',truppTab!=='players');
   $('truppPlayers').classList.toggle('hidden',truppTab!=='players');
   $('truppRelations').classList.toggle('hidden',truppTab!=='relations');
   $('truppLevels').classList.toggle('hidden',truppTab!=='levels');
@@ -1260,27 +1291,25 @@ function posChipOptions(){
 function renderTruppFilter(){
   const tier=normSel(S().truppFilter), pos=S().truppPos||[];
   // Antalen i varje grupp räknas med det andra filtret aktivt, så de stämmer.
-  let html='<span class="fb-lbl">Nivå</span>'+
+  const bar=$('truppFilter');
+  bar.innerHTML='<span class="fb-lbl">Nivå</span>'+
     selChipRow(tier,val=>root.players.filter(p=>
       inSel(p,val==='all'?[]:[val])&&inPosSel(p,pos)).length);
+  const posBar=$('truppPosFilter');
   const opts=posChipOptions();
-  if(opts.length>1){
-    html+='<span class="fb-lbl">Position</span>'+opts.map(([val,label])=>{
-      const on=val==='all'?!pos.length:pos.indexOf(val)>=0;
-      const n=root.players.filter(p=>
-        inPosSel(p,val==='all'?[]:[val])&&inSel(p,tier)).length;
-      return '<button class="fchip'+(on?' sel':'')+'" data-p="'+esc(val)+'">'+esc(label)+
-        '<span class="n">'+n+'</span></button>';
-    }).join('');
-  }
-  const bar=$('truppFilter');
-  bar.innerHTML=html;
+  posBar.innerHTML=opts.length>1?('<span class="fb-lbl">Position</span>'+opts.map(([val,label])=>{
+    const on=val==='all'?!pos.length:pos.indexOf(val)>=0;
+    const n=root.players.filter(p=>
+      inPosSel(p,val==='all'?[]:[val])&&inSel(p,tier)).length;
+    return '<button class="fchip'+(on?' sel':'')+'" data-p="'+esc(val)+'">'+esc(label)+
+      '<span class="n">'+n+'</span></button>';
+  }).join('')):'';
   bar.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{
     const v=b.dataset.f;
     S().truppFilter=toggleSel(S().truppFilter,v==='all'?'all':(v==='none'?'none':parseInt(v,10)));
     save(); renderTrupp();
   });
-  bar.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{
+  posBar.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{
     const v=b.dataset.p;
     const cur=(S().truppPos||[]).slice();
     if(v==='all') S().truppPos=[];
@@ -1720,7 +1749,7 @@ function renderLevels(){
   if(!ps.length) html+='<div class="empty">Inga aktiva spelare.</div>';
   box.innerHTML=html;
   fillSvg(box);
-  $('lvlLock').onclick=()=>{ pinUnlocked=false; truppTab='players'; renderTrupp(); };
+  $('lvlLock').onclick=()=>{ setUnlocked(false); truppTab='players'; renderTrupp(); };
   box.querySelectorAll('[data-lvl]').forEach(b=>b.onclick=()=>{
     const p=pById(b.dataset.pid); if(!p) return;
     const n=parseInt(b.dataset.lvl,10);
@@ -2318,12 +2347,12 @@ $('setPinBtn').onclick=()=>{
     const a=w.querySelector('#pinN1').value,b=w.querySelector('#pinN2').value;
     if(!validPinFormat(a)){ toast('PIN måste vara 4–6 siffror'); return; }
     if(a!==b){ toast('PIN-koderna matchar inte'); return; }
-    S().pinHash=await hashPin(a); pinUnlocked=false; save(); closeModal(); renderSettings(); toast('PIN sparad');
+    S().pinHash=await hashPin(a); setUnlocked(false); save(); closeModal(); renderSettings(); toast('PIN sparad');
   };
   const rm=w.querySelector('#pinRemove');
   if(rm) rm.onclick=async()=>{
     if(!(await verifyPin(w.querySelector('#pinOld').value))){ toast('Ange nuvarande PIN först'); return; }
-    S().pinHash=null; pinUnlocked=false; save(); closeModal(); renderSettings(); toast('PIN borttagen');
+    S().pinHash=null; setUnlocked(false); save(); closeModal(); renderSettings(); toast('PIN borttagen');
   };
 };
 
@@ -2399,7 +2428,7 @@ function importFull(d){
   w.querySelector('#imReplace').onclick=()=>{
     root=normalizeRoot(d); root.onboarded=true;
     delete root.exportType; delete root.exportedAt;
-    pinUnlocked=false; save(); closeModal(); applyTheme(); show('vTrupp'); toast('Databas ersatt');
+    setUnlocked(false); save(); closeModal(); applyTheme(); show('vTrupp'); toast('Databas ersatt');
   };
   w.querySelector('#imMerge').onclick=()=>{
     const byId=new Set(root.players.map(p=>p.id));
@@ -2423,7 +2452,7 @@ function importFull(d){
 }
 $('resetAllBtn').onclick=()=>confirmModal('Nollställa allt?','All data på den här enheten raderas permanent. Exportera en backup först om du är osäker.','Radera allt',()=>{
   idbClear().catch(()=>{});
-  root=freshRoot(); pinUnlocked=false; save();
+  root=freshRoot(); setUnlocked(false); save();
   $('welcome').classList.remove('hidden');
   applyTheme(); renderNavCtx();
 },true);
@@ -2438,7 +2467,7 @@ $('wGo').onclick=async()=>{
   if(pin) S().pinHash=await hashPin(pin);
   root.onboarded=true; save();
   $('welcome').classList.add('hidden');
-  show('vTrupp');
+  renderNavLock(); show('vTrupp');
 };
 $('wImportFile').onchange=e=>{
   const f=e.target.files[0]; e.target.value='';
@@ -2450,7 +2479,7 @@ $('wImportFile').onchange=e=>{
       root=normalizeRoot(d); root.onboarded=true;
       delete root.exportType; delete root.exportedAt;
       save(); $('welcome').classList.add('hidden');
-      applyTheme(); show('vTrupp'); toast('Databas återställd. Välkommen tillbaka!');
+      applyTheme(); renderNavLock(); show('vTrupp'); toast('Databas återställd. Välkommen tillbaka!');
     } else toast('Filen känns inte igen som en Teambuilder-backup');
   };
   rd.readAsText(f);
@@ -2463,7 +2492,7 @@ async function boot(){
   root=normalizeRoot(data);
   applyTheme();
   if(!root.onboarded) $('welcome').classList.remove('hidden');
-  renderNavCtx();
+  renderNavCtx(); renderNavLock();
   show('vTrupp');
 }
 boot();
