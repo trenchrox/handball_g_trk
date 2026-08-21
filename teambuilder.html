@@ -248,6 +248,22 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .plistrow .pmeta { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; min-width: 0; }
   .plistrow.inactive { opacity: 0.45; }
+  /* ---------- Klistra in trupp ---------- */
+  .pastearea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13.5px;
+    line-height: 1.5; min-height: 150px; }
+  .maprow { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+  .maprow .mr-lbl { font-size: 12px; color: var(--ink-faint); font-weight: 700; width: 26px; flex-shrink: 0;
+    font-variant-numeric: tabular-nums; }
+  .maprow .mr-ex { font-size: 12.5px; color: var(--ink-dim); flex: 1; min-width: 0; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .maprow select { width: 132px; flex-shrink: 0; margin-bottom: 0; padding: 9px 10px; font-size: 13px; }
+  .pastesum { background: var(--panel-2); border: 1px solid var(--line); padding: 13px 15px;
+    font-size: 13.5px; line-height: 1.6; margin-bottom: 13px; }
+  .pastesum b { color: var(--ink); }
+  .pastesum .ok { color: var(--save); font-weight: 700; }
+  .pastesum .dup { color: var(--accent-2); font-weight: 700; }
+  .pastesum .names { color: var(--ink-dim); margin-top: 6px; font-size: 12.5px; }
+
   /* ---------- Filterknappar (nivåer i truppvyn) ---------- */
   .filterbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
   .fchip { background: var(--panel-2); color: var(--ink-dim); border: 1px solid var(--line);
@@ -490,6 +506,7 @@
       <div><h2><span class="h2-icon" data-svg="users"></span>Trupp</h2>
         <p class="sub" id="truppSub">Spelarregister, relationer och nivåer.</p></div>
       <div class="head-actions">
+        <button class="topbtn" id="pasteSquadBtn"><span data-svg="paste"></span> Klistra in trupp</button>
         <button class="primary" id="addPlayerBtn">+ Lägg till spelare</button>
       </div>
     </div>
@@ -691,6 +708,7 @@ const SVG = {
   download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M4 19h16"/></svg>',
   upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4 19h16"/></svg>',
   gridIc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7"/><rect x="13" y="4" width="7" height="7"/><rect x="4" y="13" width="7" height="7"/><rect x="13" y="13" width="7" height="7"/></svg>',
+  paste: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M9.5 10h5M9.5 14h5"/></svg>',
   listIc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>'
 };
 function fillSvg(scope){
@@ -1216,6 +1234,185 @@ function renderPlayers(){
   g.querySelectorAll('[data-pid]').forEach(el=>el.onclick=()=>openPlayerEditor(el.dataset.pid));
 }
 $('addPlayerBtn').onclick=()=>openPlayerEditor(null);
+
+/* =====================================================================
+   Klistra in trupp — en spelare per rad, tabb/semikolon/komma-separerat
+   ===================================================================== */
+const PASTE_ROLES=[['name','Namn'],['first','Förnamn'],['last','Efternamn'],
+  ['pos','Position'],['hand','Hänthet'],['serie','Serienivå'],['skip','Hoppa över']];
+const HEADER_HINTS={
+  name:['namn','name','spelare','fullständigt namn','fullstandigt namn'],
+  first:['förnamn','fornamn','first','first name','tilltalsnamn'],
+  last:['efternamn','last','last name','surname'],
+  pos:['position','pos','plats'],
+  hand:['hänthet','hanthet','hand','handedness'],
+  serie:['serienivå','serieniva','nivå','niva','serie','level']
+};
+// Dela upp inklistrad text i rader och kolumner. Separator väljs bara om den
+// finns på varje rad, annars är hela raden ett enda namn.
+function splitPasted(text){
+  const lines=String(text||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(!lines.length) return {rows:[],sep:null};
+  let sep=null;
+  for(const ch of ['\t',';',',']){
+    if(lines.every(l=>l.indexOf(ch)>=0)){ sep=ch; break; }
+  }
+  let rows=lines.map(l=>sep?l.split(sep).map(c=>c.trim()):[l]);
+  const width=Math.max.apply(null,rows.map(r=>r.length));
+  rows=rows.map(r=>{ while(r.length<width) r.push(''); return r; });
+  return {rows,sep};
+}
+function parsePastedPos(v){
+  const s=String(v||'').trim().toLowerCase();
+  if(!s) return null;
+  for(const [c,n] of POS_FULL.concat(POS_SIMPLE))
+    if(s===c.toLowerCase()||s===n.toLowerCase()) return c;
+  return null;
+}
+function parsePastedHand(v){
+  const s=String(v||'').trim().toLowerCase();
+  return (s.charAt(0)==='v'||s.charAt(0)==='l')?'V':'H';
+}
+function parsePastedSerie(v){
+  const m=String(v||'').trim().match(/^(?:niv[åa]\s*)?([123])$/i);
+  return m?parseInt(m[1],10):null;
+}
+function cleanPastedName(v){
+  let s=String(v||'').replace(/\s+/g,' ').trim();
+  s=s.replace(/^\d+[.)]\s*/,'');                      // "1. Anna" → "Anna"
+  if((s.match(/,/g)||[]).length===1){                 // "Andersson, Anna" → "Anna Andersson"
+    const parts=s.split(',').map(x=>x.trim());
+    if(parts[0]&&parts[1]) s=parts[1]+' '+parts[0];
+  }
+  return s;
+}
+// Gissa en kolumns roll utifrån innehållet, när rubrikrad saknas.
+function sniffPasteRole(vals){
+  const v=vals.filter(x=>String(x||'').trim());
+  if(!v.length) return 'skip';
+  if(v.every(x=>parsePastedPos(x))) return 'pos';
+  if(v.every(x=>/^(v|h|l|r|vänster|vanster|höger|hoger|left|right|vänsterhänt|högerhänt)$/i.test(String(x).trim()))) return 'hand';
+  if(v.every(x=>parsePastedSerie(x)!==null)) return 'serie';
+  return 'skip';
+}
+// Gissa kolumnroller. Känns första raden igen som rubrikrad används den.
+function guessPasteMap(rows,sep){
+  const head=rows[0]||[];
+  const roles=head.map(cell=>{
+    const s=String(cell||'').trim().toLowerCase().replace(/[:*]+$/,'');
+    for(const r in HEADER_HINTS) if(HEADER_HINTS[r].indexOf(s)>=0) return r;
+    return null;
+  });
+  const named=roles.some(r=>r==='name'||r==='first'||r==='last');
+  if(named) return {map:roles.map(r=>r||'skip'),hasHeader:true};
+  const cols=head.map((_,i)=>rows.map(r=>r[i]));
+  // Två kommaseparerade kolumner utan rubrik är nästan alltid
+  // "Efternamn, Förnamn" – om inte andra kolumnen känns igen som något annat.
+  if(sep===','&&head.length===2&&sniffPasteRole(cols[1])==='skip')
+    return {map:['last','first'],hasHeader:false};
+  return {map:head.map((_,i)=>i===0?'name':sniffPasteRole(cols[i])),hasHeader:false};
+}
+function buildPastedPlayers(rows,map){
+  const out=[];
+  rows.forEach(cells=>{
+    let name='',first='',last='',pos=null,hand='H',serie=null;
+    map.forEach((role,i)=>{
+      const v=cells[i]||'';
+      if(role==='name') name=v;
+      else if(role==='first') first=v;
+      else if(role==='last') last=v;
+      else if(role==='pos') pos=parsePastedPos(v);
+      else if(role==='hand') hand=parsePastedHand(v);
+      else if(role==='serie') serie=parsePastedSerie(v);
+    });
+    const joined=name||[first,last].filter(Boolean).join(' ');
+    const n=cleanPastedName(joined);
+    if(n) out.push({name:n,pos,serie,hand});
+  });
+  return out;
+}
+$('pasteSquadBtn').onclick=()=>{
+  const w=modal('<h2>Klistra in trupp</h2>'+
+    '<p class="sub" style="margin-bottom:16px">En spelare per rad. Kopierar du flera kolumner från Excel '+
+    'känner appen igen dem – kontrollera bara att de hamnat rätt.</p>'+
+    '<textarea id="pasteIn" class="pastearea" rows="8" placeholder="Anna Andersson&#10;Bea Berg&#10;Cleo Carlsson"></textarea>'+
+    '<div id="pasteMap"></div>'+
+    '<div id="pasteSum"></div>'+
+    '<div class="btnrow"><button class="ghost" id="pasteCancel">Avbryt</button>'+
+      '<button class="primary" id="pasteOk" disabled>Lägg till</button></div>',{sticky:true});
+  let map=null, mapDirty=false, rows=[], freshList=[];
+  const ta=w.querySelector('#pasteIn');
+  function analyse(){
+    const parsed=splitPasted(ta.value);
+    const all=parsed.rows;
+    const g=guessPasteMap(all,parsed.sep);
+    rows=g.hasHeader?all.slice(1):all;
+    // Behåll en egen mappning så länge antalet kolumner är oförändrat.
+    if(!mapDirty||!map||map.length!==g.map.length) map=g.map;
+    return buildPastedPlayers(rows,map);
+  }
+  function paint(){
+    const cands=analyse();
+    // kolumnmappning visas bara när det finns mer än en kolumn
+    const mapBox=w.querySelector('#pasteMap');
+    if(map&&map.length>1){
+      mapBox.innerHTML='<label class="fld" style="margin-top:4px">Kolumner</label>'+
+        map.map((role,i)=>{
+          const ex=(rows[0]&&rows[0][i])?rows[0][i]:'';
+          return '<div class="maprow"><span class="mr-lbl">'+(i+1)+'</span>'+
+            '<select data-col="'+i+'">'+PASTE_ROLES.map(([v,l])=>
+              '<option value="'+v+'"'+(role===v?' selected':'')+'>'+l+'</option>').join('')+'</select>'+
+            '<span class="mr-ex">'+esc(ex)+'</span></div>';
+        }).join('');
+      mapBox.querySelectorAll('[data-col]').forEach(sel=>sel.onchange=()=>{
+        map[parseInt(sel.dataset.col,10)]=sel.value; mapDirty=true; paint();
+      });
+    } else mapBox.innerHTML='';
+    // dubbletter mot truppen och inom listan
+    const existing={}; root.players.forEach(p=>{ existing[p.name.toLowerCase().trim()]=true; });
+    const seen={}, fresh=[], dupes=[];
+    cands.forEach(c=>{
+      const k=c.name.toLowerCase();
+      if(existing[k]||seen[k]){ dupes.push(c.name); return; }
+      seen[k]=true; fresh.push(c);
+    });
+    const sum=w.querySelector('#pasteSum');
+    if(!cands.length) sum.innerHTML='';
+    else {
+      const withPos=fresh.filter(c=>c.pos).length, withSerie=fresh.filter(c=>c.serie).length;
+      const extra=[];
+      if(withPos) extra.push(withPos+' med position');
+      if(withSerie) extra.push(withSerie+' med serienivå');
+      sum.innerHTML='<div class="pastesum"><span class="ok">'+fresh.length+' nya spelare</span>'+
+        (dupes.length?' · <span class="dup">'+dupes.length+' finns redan</span> (hoppas över)':'')+
+        (extra.length?'<br>'+esc(extra.join(' · ')):'')+
+        (fresh.length?'<div class="names">'+esc(fresh.slice(0,8).map(c=>c.name).join(', '))+
+          (fresh.length>8?' … +'+(fresh.length-8)+' fler':'')+'</div>':'')+
+        (dupes.length?'<div class="names">Hoppas över: '+esc(dupes.slice(0,6).join(', '))+
+          (dupes.length>6?' …':'')+'</div>':'')+'</div>';
+    }
+    freshList=fresh;
+    const ok=w.querySelector('#pasteOk');
+    ok.disabled=!fresh.length;
+    ok.textContent=fresh.length?('Lägg till '+fresh.length+' spelare'):'Lägg till';
+  }
+  ta.oninput=paint;
+  ta.focus();
+  w.querySelector('#pasteCancel').onclick=closeModal;
+  w.querySelector('#pasteOk').onclick=()=>{
+    const fresh=freshList;
+    if(!fresh.length) return;
+    fresh.forEach((c,i)=>root.players.push({
+      id:uid(),name:c.name,pos:c.pos||null,pos2:null,serie:c.serie||null,
+      hand:c.hand||'H',color:PLAYER_COLORS[(root.players.length+i)%PLAYER_COLORS.length],
+      photo:null,active:true,level:null,levelUpdated:null,note:''
+    }));
+    S().truppFilter=[];   // visa hela truppen så de nya syns
+    save(); closeModal(); renderTrupp();
+    toast(fresh.length+' spelare tillagda');
+  };
+  paint();
+};
 
 function openPlayerEditor(pid){
   const p=pid?pById(pid):null;
