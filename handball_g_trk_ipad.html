@@ -687,7 +687,7 @@
   <button class="navlink" id="resetAllBtn"><span class="ic" data-svg="trash"></span>Nollställ allt</button>
   <button class="navlink" id="themeToggle"><span class="ic" id="themeIcon">☾</span><span id="themeLabel">Mörkt läge</span></button>
   <div class="ctx" id="ctx"></div>
-  <div class="app-version">v1.0</div>
+  <div class="app-version">v1.1</div>
 </nav>
 <main>
 <div class="view" id="vBank">
@@ -776,6 +776,7 @@
       <div class="matchup" id="matchTitle"></div>
     </div>
     <div style="display:flex;gap:10px">
+      <button class="topbtn" id="matchExportBtn">⬇ Exportera</button>
       <button class="topbtn danger" id="matchDelete"><span data-svg="trash"></span> Ta bort</button>
       <button class="topbtn lock" id="lockBtn">Lås match</button>
     </div>
@@ -2133,6 +2134,10 @@ document.getElementById('showShotList').onclick=()=>{
   scrim.onclick=e=>{ if(e.target===scrim) scrim.remove(); };
 };
 
+document.getElementById('matchExportBtn').onclick=()=>{
+  const m=curMatch(); if(!m) return;
+  buildMatchPDF(m.id);
+};
 document.getElementById('matchDelete').onclick=()=>{
   const c=curComp(), m=curMatch(); if(!c||!m) return;
   const opp=team(m.oppId);
@@ -2552,7 +2557,127 @@ function buildGoaliePDF(gkId, matchIds, sects, summaryOnly){
   else { infoModal('Kunde inte öppna ett nytt fönster för PDF:en. Tillåt popup-fönster och försök igen.','PDF'); }
 }
 
-/* ----- Compare goalkeepers ----- */
+/* ----- Single-match export (with shot list) ----- */
+function buildMatchPDF(matchId){
+  const comp=curComp(); const m=curMatch();
+  if(!m || m.id!==matchId){ /* fall back to searching all comps */ }
+  const mm=m; if(!mm){ infoModal('Ingen match vald.','Export'); return; }
+  const me=ownTeam(); const opp=team(mm.oppId);
+  const home=mm.home!==false;
+  const myName=esc(me?.name||'Mitt lag'), oppName=esc(opp?.name||'?');
+  const shots=mm.shots||[];
+  const st=aggregate(shots);
+  const today=new Date().toISOString().slice(0,10);
+  const compName=comp?esc(comp.name):'';
+  const kindTxt = mm.kind==='training' ? 'Träningsmatch' : 'Tävlingsmatch';
+
+  // result banner
+  let resTxt='Matchöversikt';
+  if(mm.scoreOwn!=null && mm.scoreOpp!=null){
+    const lo=home?mm.scoreOwn:mm.scoreOpp, ro=home?mm.scoreOpp:mm.scoreOwn;
+    const wl=mm.scoreOwn>mm.scoreOpp?'Vinst':(mm.scoreOwn<mm.scoreOpp?'Förlust':'Oavgjort');
+    resTxt=`${home?myName:oppName} ${lo}–${ro} ${home?oppName:myName} · ${wl}`;
+  }
+
+  // playtime per goalie (from gkLog + goalie currently in)
+  const secsByGk={};
+  (mm.gkLog||[]).forEach(e=>{ secsByGk[e.gkId]=(secsByGk[e.gkId]||0)+(e.seconds||0); });
+  if(mm.gkId){ const liveSecs=Math.max(0, matchElapsedSec(mm)-(mm.gkInClock||0)); if(liveSecs>0) secsByGk[mm.gkId]=(secsByGk[mm.gkId]||0)+liveSecs; }
+  const gkRows=Object.keys(secsByGk).map(id=>{ const g=goalie(id); const gs=aggregate(shots.filter(s=>(s.shotGk||mm.gkId)===id));
+    return `<tr><td>${esc(g?g.name:'—')}</td><td>${fmtMinSec(secsByGk[id])}</td><td>${gs.shots}</td><td>${gs.saves}</td><td>${gs.goals}</td><td><b>${gs.shots?gs.pct+'%':'–'}</b></td></tr>`; }).join('');
+
+  // 10-minute breakdown
+  const timed=shots.filter(s=>s.clock!=null);
+  let intervalRows='';
+  if(timed.length){
+    const maxClock=Math.max(...timed.map(s=>s.clock));
+    const nBins=Math.max(1,Math.ceil((maxClock+1)/600));
+    for(let i=0;i<nBins;i++){
+      const from=i*600,to=(i+1)*600; const inBin=timed.filter(s=>s.clock>=from&&s.clock<to); const a=aggregate(inBin);
+      intervalRows+=`<tr><td>${i*10}–${(i+1)*10} min</td><td>${a.shots}</td><td>${a.saves}</td><td>${a.goals}</td><td>${a.out||0}</td><td><b>${a.shots?a.pct+'%':'–'}</b></td></tr>`;
+    }
+  }
+
+  // chronological shot list grouped by period
+  const periods=[1,2,3,4].filter(p=>shots.some(s=>(s.period||1)===p));
+  let shotList='';
+  periods.forEach(p=>{
+    const list=shots.filter(s=>(s.period||1)===p);
+    const ps=aggregate(list);
+    shotList+=`<tr class="slp"><td colspan="6">${PERIOD_NAMES[p]} — ${ps.saves} räddn · ${ps.goals} mål${ps.out?' · '+ps.out+' utanför':''}</td></tr>`;
+    list.forEach((s,i)=>{
+      const g=s.shotGk?goalie(s.shotGk):(mm.gkId?goalie(mm.gkId):null);
+      const zone=(s.zone!=null)?ZONES[s.zone]:'–';
+      const pos=s.pos||'–';
+      const mod=s.type?' · '+esc(s.type):'';
+      const time=(s.clock!=null)?fmtClock(s.clock):'–';
+      const oc=s.out?'Utanför':(s.saved?'Räddning':'Mål');
+      const ocColor=s.out?'#888':(s.saved?'#1d9e75':'#e2403e');
+      shotList+=`<tr><td>${i+1}</td><td>${time}</td><td>${esc(pos)}${mod}</td><td>${esc(zone)}</td><td>${g?esc(g.name):'—'}</td><td style="color:${ocColor};font-weight:700">${oc}</td></tr>`;
+    });
+  });
+  if(!shots.length) shotList='<tr><td colspan="6" style="text-align:center;color:#888;padding:20px">Inga skott registrerade.</td></tr>';
+
+  const page=`<section class="page">
+    <div class="phead"><div><div class="ptitle">${myName} vs ${oppName}</div>
+      <div class="psub">${mm.date||''} · ${home?'Hemma':'Borta'} · ${kindTxt}${compName?' · '+compName:''}</div></div>
+      <div class="pdate">${today}</div></div>
+    <div class="pbanner">${resTxt}</div>
+    <div class="pkeys">
+      <div class="pk"><div class="pkn">${st.shots}</div><div class="pkl">Skott på mål</div></div>
+      <div class="pk"><div class="pkn" style="color:#1d9e75">${st.saves}</div><div class="pkl">Räddningar</div></div>
+      <div class="pk"><div class="pkn" style="color:#e2403e">${st.goals}</div><div class="pkl">Mål</div></div>
+      <div class="pk"><div class="pkn">${st.shots?st.pct+'%':'–'}</div><div class="pkl">Räddning %</div></div>
+      ${st.out?`<div class="pk"><div class="pkn">${st.out}</div><div class="pkl">Utanför</div></div>`:''}
+    </div>
+    ${gkRows?`<div class="pcard"><div class="pct-h">Målvakter</div><table class="ptab"><tr><th>Målvakt</th><th>Speltid</th><th>Skott</th><th>Räddn</th><th>Mål</th><th>%</th></tr>${gkRows}</table></div>`:''}
+    <div class="pcard"><div class="pct-h">Heatmap — räddning % per målzon</div><div class="pgrid">${heatCellsHTML(shots)}</div><div class="pmeta">Grönt = hög räddningsprocent · rött = många insläppta</div></div>
+    <div class="pcard"><div class="pct-h">Räddning % per skottläge</div>${barsHTML(groupPct(shots,'pos'))}</div>
+    ${intervalRows?`<div class="pcard"><div class="pct-h">Per 10 minuter</div><table class="ptab"><tr><th>Intervall</th><th>Skott</th><th>Räddn</th><th>Mål</th><th>Utanför</th><th>%</th></tr>${intervalRows}</table></div>`:''}
+    <div class="pcard"><div class="pct-h">Skottlista</div><table class="ptab sltab"><tr><th>#</th><th>Tid</th><th>Läge</th><th>Målzon</th><th>Målvakt</th><th>Utfall</th></tr>${shotList}</table></div>
+  </section>`;
+
+  const css=`
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Instrument Sans',-apple-system,Helvetica,Arial,sans-serif;color:#1a1a1f;background:#fff}
+    .page{width:210mm;min-height:297mm;padding:18mm 16mm;position:relative}
+    .phead{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1a1a1f;padding-bottom:10px;margin-bottom:4px}
+    .ptitle{font-size:24px;font-weight:700;letter-spacing:-.01em}
+    .psub{font-size:13px;color:#666;margin-top:3px}
+    .pdate{font-size:12px;color:#888;text-align:right;line-height:1.5}
+    .pbanner{background:#1a1a1f;color:#fff;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:7px 14px;margin:16px 0 18px;display:inline-block}
+    .pkeys{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+    .pk{flex:1;min-width:90px;background:#f4f4f7;padding:14px;text-align:center}
+    .pkn{font-size:30px;font-weight:700;line-height:1}
+    .pkl{font-size:11px;color:#777;margin-top:6px;text-transform:uppercase;letter-spacing:.04em}
+    .pcard{border:1px solid #e4e4ea;padding:16px 18px;margin-bottom:16px;page-break-inside:avoid}
+    .pct-h{font-size:14px;font-weight:700;margin-bottom:12px}
+    .pgrid{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:6px;max-width:340px;margin:0 auto 8px;aspect-ratio:3/2}
+    .pz{display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:17px;font-weight:700;min-height:64px}
+    .pz span{font-size:10px;font-weight:600;opacity:.85;margin-top:2px}
+    .pmeta{font-size:11px;color:#888;text-align:center;margin-top:6px}
+    .pbar{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+    .pbl{font-size:12px;width:120px;flex-shrink:0;color:#333}
+    .pbt{flex:1;height:16px;background:#eee;overflow:hidden}
+    .pbf{display:block;height:100%;background:#1d9e75}
+    .pbf.save{background:#1d9e75}
+    .pbn{font-size:12px;width:120px;text-align:right;flex-shrink:0;color:#333}
+    .pbn small{color:#999}
+    .ptab{width:100%;border-collapse:collapse;font-size:12px}
+    .ptab th{text-align:left;border-bottom:2px solid #ddd;padding:7px 8px;color:#666;font-weight:700}
+    .ptab td{border-bottom:1px solid #eee;padding:6px 8px}
+    .sltab .slp td{background:#f4f4f7;font-weight:700;color:#333;border-bottom:1px solid #ddd;padding:7px 8px}
+    @page{size:A4;margin:0}
+    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+  `;
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${myName} vs ${oppName} – Matchrapport</title><style>${css}</style></head><body>${page}
+    <script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script></body></html>`;
+  const w=window.open('','_blank');
+  if(w){ w.document.open(); w.document.write(html); w.document.close(); }
+  else { infoModal('Kunde inte öppna ett nytt fönster för PDF:en. Tillåt popup-fönster och försök igen.','Export'); }
+}
+
+
 let cmpSel=[null,null];
 document.getElementById('gkCompareBtn').onclick=()=>{
   const gks=goalies();
