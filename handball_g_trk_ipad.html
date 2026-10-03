@@ -687,7 +687,7 @@
   <button class="navlink" id="resetAllBtn"><span class="ic" data-svg="trash"></span>Nollställ allt</button>
   <button class="navlink" id="themeToggle"><span class="ic" id="themeIcon">☾</span><span id="themeLabel">Mörkt läge</span></button>
   <div class="ctx" id="ctx"></div>
-  <div class="app-version">v1.1</div>
+  <div class="app-version">v1.2</div>
 </nav>
 <main>
 <div class="view" id="vBank">
@@ -1676,8 +1676,8 @@ function newComp(type){
 }
 document.getElementById('addMatch').onclick=()=>{
   const today=new Date().toISOString().slice(0,10);
-  const matchScope={type:cur.compType,id:cur.compId};
-  const opts=db.teams.filter(t=>!t.own && teamInScope(t, matchScope)).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  // show every opponent in the team bank, regardless of which competition it was filed under
+  const opts=db.teams.filter(t=>!t.own).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
   const gkOpts=goalies().map(g=>`<option value="${g.id}">${(g.number!==undefined&&g.number!=="")?"#"+g.number+" ":""}${esc(g.name)}</option>`).join('');
   const isSeason = cur.compType==='season';
   const kindBlock = isSeason ? `
