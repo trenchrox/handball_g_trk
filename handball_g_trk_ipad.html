@@ -359,9 +359,16 @@
   .gk-card-name { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .gk-card-name .gknum { color: var(--accent); }
   .gk-card-sub { font-size: 12px; color: var(--ink-faint); }
+  .gk-row-btns { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
   .gk-swap { background: var(--panel-2); color: var(--accent); border: 1px solid var(--accent);
     border-radius: 0; padding: 14px 18px; font-size: 14px; font-weight: 700; white-space: nowrap; transition: var(--tap); }
   .gk-swap:active { transform: scale(0.96); }
+  .gk-assist { display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: var(--panel-2); color: var(--save); border: 1px solid var(--save);
+    border-radius: 0; padding: 10px 18px; font-size: 14px; font-weight: 700; white-space: nowrap; transition: var(--tap); }
+  .gk-assist:active { transform: scale(0.96); }
+  .gk-assist .asc { background: var(--save); color: #04231b; font-size: 12px; font-weight: 800;
+    min-width: 20px; padding: 1px 6px; text-align: center; }
   .match-heat { margin-top: 0; width: 100%; padding: 10px 18px 0; }
   .mh-head { font-size: 15px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-dim);
     font-weight: 700; margin-bottom: 10px; }
@@ -687,7 +694,7 @@
   <button class="navlink" id="resetAllBtn"><span class="ic" data-svg="trash"></span>Nollställ allt</button>
   <button class="navlink" id="themeToggle"><span class="ic" id="themeIcon">☾</span><span id="themeLabel">Mörkt läge</span></button>
   <div class="ctx" id="ctx"></div>
-  <div class="app-version">v1.2</div>
+  <div class="app-version">v1.5</div>
 </nav>
 <main>
 <div class="view" id="vBank">
@@ -822,7 +829,10 @@
       </div>
       <div class="gk-row">
         <div class="gk-card" id="gkCard"></div>
-        <button class="gk-swap" id="bGk">⇄ Byt målvakt</button>
+        <div class="gk-row-btns">
+          <button class="gk-swap" id="bGk">⇄ Byt målvakt</button>
+          <button class="gk-assist" id="bAssist"><span>+ Assist</span><span class="asc" id="assistCount">0</span></button>
+        </div>
       </div>
       <div class="match-heat" id="matchHeat"></div>
       <div class="commit-zone">
@@ -879,6 +889,7 @@
     <div class="stat-box"><div class="n" id="gkShots">0</div><div class="l">Skott</div></div>
     <div class="stat-box"><div class="n" style="color:var(--save)" id="gkSaves">0</div><div class="l">Räddningar</div></div>
     <div class="stat-box"><div class="n" id="gkPct">–</div><div class="l">Räddn. %</div></div>
+    <div class="stat-box"><div class="n" style="color:var(--save)" id="gkAssists">0</div><div class="l">Assist</div></div>
   </div>
   <div class="card" style="margin-bottom:16px">
     <div class="title" style="margin-bottom:12px">Heatmap — räddning % per målzon</div>
@@ -1697,7 +1708,10 @@ document.getElementById('addMatch').onclick=()=>{
        <button type="button" class="ha sel" data-ha="home">Hemma</button>
        <button type="button" class="ha" data-ha="away">Borta</button>
      </div>
-     <label class="fld">Halvlekslängd (minuter)</label><input id="fHalf" type="number" inputmode="numeric" min="1" max="45" value="30" placeholder="30">
+     <div style="display:flex;gap:12px">
+       <div style="flex:1"><label class="fld">Halvlekslängd (min)</label><input id="fHalf" type="number" inputmode="numeric" min="1" max="45" value="30" placeholder="30"></div>
+       <div style="flex:1"><label class="fld">Full matchtid (min)</label><input id="fFull" type="number" inputmode="numeric" min="1" max="120" value="60" placeholder="60"></div>
+     </div>
      <label class="fld">Målvakt</label>
      <select id="gkSel"><option value="">— Välj målvakt —</option>${gkOpts}<option value="__new">+ Ny målvakt…</option></select>
      <div id="gkNewWrap" class="hidden"><label class="fld">Ny målvakts namn</label><input id="gkNewName" placeholder="Namn"></div>`,
@@ -1714,26 +1728,49 @@ document.getElementById('addMatch').onclick=()=>{
       else if(gkId){ gkName=goalie(gkId)?.name||''; }
       else { gkId=null; gkName='Målvakt'; }
       const halfLen=Math.max(1,parseInt(sc.querySelector('#fHalf').value)||30);
+      const fullLen=Math.max(halfLen,parseInt(sc.querySelector('#fFull').value)||halfLen*2);
       const home=sc.querySelector('#haSeg .ha.sel').dataset.ha==='home';
       // cups are always competitive; in season the user chooses
       const kind = isSeason ? (sc.querySelector('#kindSeg .ha.sel').dataset.kind) : 'competitive';
-      const m={id:uid(),oppId,date:sc.querySelector('#f2').value,gkId,gk:gkName,shots:[],halfLen,clockSec:0,clockRunning:false,gkInClock:0,home,scoreOwn:null,scoreOpp:null,kind};
+      const m={id:uid(),oppId,date:sc.querySelector('#f2').value,gkId,gk:gkName,shots:[],halfLen,fullLen,clockSec:0,clockRunning:false,gkInClock:0,home,scoreOwn:null,scoreOpp:null,kind};
       curComp().matches.unshift(m); save(); renderComp(); openMatch(m.id);
     });
   scrim.querySelectorAll('.ha-seg').forEach(seg=>seg.onclick=e=>{ const b=e.target.closest('.ha'); if(!b) return;
     seg.querySelectorAll('.ha').forEach(x=>x.classList.toggle('sel',x===b)); });
   scrim.querySelector('#oppSel').onchange=e=>scrim.querySelector('#newWrap').classList.toggle('hidden',e.target.value!=='__new');
   scrim.querySelector('#gkSel').onchange=e=>scrim.querySelector('#gkNewWrap').classList.toggle('hidden',e.target.value!=='__new');
+  // suggest full time = 2× half length as the user types, until they edit full time themselves
+  const fHalf=scrim.querySelector('#fHalf'), fFull=scrim.querySelector('#fFull'); let fullEdited=false;
+  fFull.oninput=()=>{ fullEdited=true; };
+  fHalf.oninput=()=>{ if(!fullEdited){ const h=parseInt(fHalf.value)||0; if(h>0) fFull.value=h*2; } };
 };
 function openMatch(id){ cur.matchId=id; buildCaptureUI(); applyPeriodUI(); refreshBoard(); renderLog(); startClockTick(); show('vMatch'); }
 
 /* ---------- Match clock ---------- */
 let clockTimer=null;
+let _boundaryDialogOpen=false;
 function matchElapsedSec(m){
   if(!m) return 0;
   let s=m.clockSec||0;
   if(m.clockRunning && m.clockStartedAt){ s += Math.floor((Date.now()-m.clockStartedAt)/1000); }
   return s;
+}
+// Absolute second at which the CURRENT period should auto-stop, or null if no auto-stop applies.
+function periodBoundarySec(m){
+  if(!m) return null;
+  const half=(m.halfLen||30)*60;
+  const full=(m.fullLen||(m.halfLen||30)*2)*60;
+  const p=m.period||1;
+  if(p===1) return half;        // end of 1st half
+  if(p===2) return full;        // full time
+  return null;                  // extra time / penalties handled manually
+}
+// Label for the question shown when a boundary is hit.
+function boundaryQuestion(m){
+  const p=m.period||1;
+  if(p===1) return {title:'Halvlek slut?', msg:'Klockan har nått halvlekslängden. Är första halvlek slut?', yes:'Ja, starta 2:a halvlek', nextPeriod:2};
+  if(p===2) return {title:'Full tid?', msg:'Klockan har nått full matchtid. Är matchen slut?', yes:'Ja', nextPeriod:null};
+  return null;
 }
 function fmtClock(sec){
   sec=Math.max(0,Math.floor(sec));
@@ -1756,8 +1793,40 @@ function startClockTick(){
   renderClock();
   clockTimer=setInterval(()=>{
     if(document.getElementById('vMatch').classList.contains('hidden')){ clearInterval(clockTimer); clockTimer=null; return; }
-    const m=curMatch(); if(m && m.clockRunning) renderClock();
+    const m=curMatch(); if(!m) return;
+    if(m.clockRunning){ renderClock(); checkPeriodBoundary(m); }
   },1000);
+}
+// When the running clock reaches the current period's end, pause and ask the user.
+function checkPeriodBoundary(m){
+  if(_boundaryDialogOpen || !m.clockRunning) return;
+  const bound=periodBoundarySec(m);
+  if(bound==null) return;
+  const p=m.period||1;
+  if(m._boundaryAcked===p) return; // user already chose "continue" for this period
+  if(matchElapsedSec(m) < bound) return;
+  // reached the boundary → pause exactly at the boundary and ask
+  m.clockSec=bound; m.clockRunning=false; m.clockStartedAt=null;
+  save(); renderClock();
+  const q=boundaryQuestion(m); if(!q){ return; }
+  _boundaryDialogOpen=true;
+  confirmModal(q.msg,
+    ()=>{ // Ja
+      _boundaryDialogOpen=false;
+      if(q.nextPeriod){
+        m.period=q.nextPeriod;
+        m._boundaryAcked=0;
+        applyPeriodUI(); save(); renderClock();
+      } else {
+        // full time: leave paused, mark acked so it won't re-ask if they resume
+        m._boundaryAcked=p; save();
+      }
+    },
+    ()=>{ // Nej → continue same period (stoppage time); don't ask again this period
+      _boundaryDialogOpen=false;
+      m._boundaryAcked=p; save();
+    },
+    {title:q.title, yes:q.yes, no:'Nej, fortsätt'});
 }
 function pauseClock(m){ if(m && m.clockRunning){ m.clockSec=matchElapsedSec(m); m.clockRunning=false; m.clockStartedAt=null; } }
 function applyPeriodUI(){
@@ -1871,6 +1940,8 @@ function refreshBoard(){
   document.getElementById('tSaves').textContent=st.saves;
   document.getElementById('tGoals').textContent=st.goals;
   document.getElementById('tOut').textContent=st.out;
+  const asc=document.getElementById('assistCount');
+  if(asc) asc.textContent=(m.assists||[]).length;
   renderMatchHeat(m);
   applyLockUI(m);
   renderMinutesBar(m);
@@ -1969,7 +2040,15 @@ function applyLockUI(m){
 }
 
 function renderLog(){ /* Senaste-loggen ersatt av match-heatmappen */ }
-document.getElementById('undoBtn').onclick=()=>{ const m=curMatch(); if(m.locked) return; if(m.shots.length){ m.shots.pop(); save(); refreshBoard(); renderLog(); } };
+document.getElementById('undoBtn').onclick=()=>{ const m=curMatch(); if(m.locked) return;
+  const lastShot=m.shots.length?m.shots[m.shots.length-1]:null;
+  const lastAssist=(m.assists&&m.assists.length)?m.assists[m.assists.length-1]:null;
+  if(!lastShot && !lastAssist) return;
+  // remove whichever happened most recently
+  if(lastAssist && (!lastShot || (lastAssist.t||0) > (lastShot.t||0))){ m.assists.pop(); }
+  else { m.shots.pop(); }
+  save(); refreshBoard(); renderLog();
+};
 document.getElementById('lockBtn').onclick=()=>{
   const m=curMatch();
   if(m.locked){
@@ -2036,7 +2115,7 @@ document.getElementById('lockBtn').onclick=()=>{
 };
 
 document.getElementById('matchBack').onclick=()=>{ renderComp(); show('vComp'); };
-document.getElementById('clockToggle').onclick=()=>{
+function toggleClock(){
   const m=curMatch(); if(!m||m.locked) return;
   if(m.clockRunning){
     // pause: bank elapsed time
@@ -2045,7 +2124,21 @@ document.getElementById('clockToggle').onclick=()=>{
     m.clockRunning=true; m.clockStartedAt=Date.now();
   }
   save(); renderClock();
-};
+}
+document.getElementById('clockToggle').onclick=toggleClock;
+// Keyboard: "S" starts/stops the clock, but only inside the match view and not while typing.
+document.addEventListener('keydown',(e)=>{
+  if(e.key!=='s' && e.key!=='S') return;
+  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  const vMatch=document.getElementById('vMatch');
+  if(!vMatch || vMatch.classList.contains('hidden')) return; // only in match view
+  if(_boundaryDialogOpen) return;
+  const tag=(document.activeElement&&document.activeElement.tagName)||'';
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return; // don't hijack typing
+  if(document.querySelector('.scrim')) return; // a modal is open
+  e.preventDefault();
+  toggleClock();
+});
 document.getElementById('clockAdjust').onclick=()=>{
   const m=curMatch(); if(!m||m.locked) return;
   const cur_s=matchElapsedSec(m);
@@ -2059,13 +2152,15 @@ document.getElementById('clockAdjust').onclick=()=>{
       const mm=Math.max(0,parseInt(s.querySelector('#adjMin').value)||0);
       const ss=Math.min(59,Math.max(0,parseInt(s.querySelector('#adjSec').value)||0));
       m.clockSec=mm*60+ss;
+      const bound=periodBoundarySec(m);
+      if(bound!=null && m.clockSec < bound) m._boundaryAcked=0; // re-arm if moved back before boundary
       if(m.clockRunning) m.clockStartedAt=Date.now();
       save(); renderClock();
     });
 };
 document.querySelectorAll('#periodSeg .per').forEach(b=>b.onclick=()=>{
   const m=curMatch(); if(!m||m.locked) return;
-  m.period=+b.dataset.per; save();
+  m.period=+b.dataset.per; m._boundaryAcked=0; save();
   document.querySelectorAll('#periodSeg .per').forEach(x=>x.classList.toggle('sel',x===b));
 });
 const PERIOD_NAMES={1:'1:a halvlek',2:'2:a halvlek',3:'Förlängning',4:'Straffläggning'};
@@ -2148,6 +2243,14 @@ document.getElementById('matchDelete').onclick=()=>{
 document.getElementById('btnSave').onclick=()=>commit('save');
 document.getElementById('btnGoal').onclick=()=>commit('goal');
 document.getElementById('btnOut').onclick=()=>commit('out');
+document.getElementById('bAssist').onclick=()=>{
+  const m=curMatch();
+  if(m.locked){ infoModal('Matchen är låst. Lås upp den för att ändra.', 'Låst'); return; }
+  if(!m.gkId){ infoModal('Välj en målvakt först, så kopplas assisten till rätt målvakt.', 'Ingen målvakt'); return; }
+  if(!m.assists) m.assists=[];
+  m.assists.push({ gkId:m.gkId, t:Date.now(), period:m.period||1, clock:matchElapsedSec(m) });
+  save(); refreshBoard();
+};
 document.getElementById('bGk').onclick=()=>{
   const m=curMatch();
   if(m.locked){ infoModal('Matchen är låst. Lås upp den för att ändra.', 'Låst'); return; }
@@ -2316,6 +2419,7 @@ function goalieScopedData(gkId, scope, kind){
   const shots=picked.flatMap(x=>x.shots);
   const withOpp=picked.flatMap(x=>x.shots.map(s=>({...s,oppId:x.m.oppId})));
   const totalSecs=picked.reduce((a,x)=>a+x.secs,0);
+  const assists=picked.reduce((a,x)=>a+((x.m.assists||[]).filter(e=>e.gkId===gkId).length),0);
   // minutes rows
   let minutesRows=[];
   if(singleMatch || (scope && scope!=='all')){
@@ -2327,7 +2431,7 @@ function goalieScopedData(gkId, scope, kind){
     picked.forEach(x=>{ if(x.secs>0){ const key=(x.type==='cup'?'Cup · ':'Säsong · ')+x.comp.name; byComp[key]=(byComp[key]||0)+x.secs; } });
     Object.entries(byComp).forEach(([k,sec])=>minutesRows.push({k,sec}));
   }
-  return {shots, withOpp, minutesRows, totalSecs, singleMatch};
+  return {shots, withOpp, minutesRows, totalSecs, singleMatch, assists};
 }
 function renderGoalieView(gkId, scope, kind){
   const data=goalieScopedData(gkId, scope, kind);
@@ -2336,6 +2440,7 @@ function renderGoalieView(gkId, scope, kind){
   document.getElementById('gkShots').textContent=st.shots;
   document.getElementById('gkSaves').textContent=st.saves;
   document.getElementById('gkPct').textContent=st.shots?st.pct+'%':'–';
+  const ga=document.getElementById('gkAssists'); if(ga) ga.textContent=data.assists||0;
   const hg=document.getElementById('gkHeatGrid');
   hg.innerHTML=ZONES.map((z,i)=>{
     const a=aggregate(shots.filter(x=>x.zone===i));
@@ -2579,12 +2684,22 @@ function buildMatchPDF(matchId){
     resTxt=`${home?myName:oppName} ${lo}–${ro} ${home?oppName:myName} · ${wl}`;
   }
 
-  // playtime per goalie (from gkLog + goalie currently in)
+  // playtime per goalie: logged entries are authoritative; only add live time for a
+  // currently-active goalie who has NOT yet been written to gkLog (i.e. match still in progress)
   const secsByGk={};
-  (mm.gkLog||[]).forEach(e=>{ secsByGk[e.gkId]=(secsByGk[e.gkId]||0)+(e.seconds||0); });
-  if(mm.gkId){ const liveSecs=Math.max(0, matchElapsedSec(mm)-(mm.gkInClock||0)); if(liveSecs>0) secsByGk[mm.gkId]=(secsByGk[mm.gkId]||0)+liveSecs; }
+  (mm.gkLog||[]).forEach(e=>{ secsByGk[e.gkId]=(secsByGk[e.gkId]||0)+entrySeconds(e); });
+  const currentLogged = mm.gkId && (mm.gkLog||[]).some(e=>e.gkId===mm.gkId);
+  if(mm.gkId && !currentLogged){
+    const liveSecs=Math.max(0, matchElapsedSec(mm)-(mm.gkInClock||0));
+    if(liveSecs>0) secsByGk[mm.gkId]=(secsByGk[mm.gkId]||0)+liveSecs;
+  }
+  const assistsByGk={};
+  (mm.assists||[]).forEach(a=>{ assistsByGk[a.gkId]=(assistsByGk[a.gkId]||0)+1; });
+  // include goalies who only have assists (no logged time) too
+  Object.keys(assistsByGk).forEach(id=>{ if(secsByGk[id]==null) secsByGk[id]=0; });
   const gkRows=Object.keys(secsByGk).map(id=>{ const g=goalie(id); const gs=aggregate(shots.filter(s=>(s.shotGk||mm.gkId)===id));
-    return `<tr><td>${esc(g?g.name:'—')}</td><td>${fmtMinSec(secsByGk[id])}</td><td>${gs.shots}</td><td>${gs.saves}</td><td>${gs.goals}</td><td><b>${gs.shots?gs.pct+'%':'–'}</b></td></tr>`; }).join('');
+    return `<tr><td>${esc(g?g.name:'—')}</td><td>${fmtMinSec(secsByGk[id])}</td><td>${gs.shots}</td><td>${gs.saves}</td><td>${gs.goals}</td><td>${assistsByGk[id]||0}</td><td><b>${gs.shots?gs.pct+'%':'–'}</b></td></tr>`; }).join('');
+  const totalAssists=(mm.assists||[]).length;
 
   // 10-minute breakdown
   const timed=shots.filter(s=>s.clock!=null);
@@ -2629,8 +2744,9 @@ function buildMatchPDF(matchId){
       <div class="pk"><div class="pkn" style="color:#e2403e">${st.goals}</div><div class="pkl">Mål</div></div>
       <div class="pk"><div class="pkn">${st.shots?st.pct+'%':'–'}</div><div class="pkl">Räddning %</div></div>
       ${st.out?`<div class="pk"><div class="pkn">${st.out}</div><div class="pkl">Utanför</div></div>`:''}
+      ${totalAssists?`<div class="pk"><div class="pkn" style="color:#1d9e75">${totalAssists}</div><div class="pkl">Assist</div></div>`:''}
     </div>
-    ${gkRows?`<div class="pcard"><div class="pct-h">Målvakter</div><table class="ptab"><tr><th>Målvakt</th><th>Speltid</th><th>Skott</th><th>Räddn</th><th>Mål</th><th>%</th></tr>${gkRows}</table></div>`:''}
+    ${gkRows?`<div class="pcard"><div class="pct-h">Målvakter</div><table class="ptab"><tr><th>Målvakt</th><th>Speltid</th><th>Skott</th><th>Räddn</th><th>Mål</th><th>Assist</th><th>%</th></tr>${gkRows}</table></div>`:''}
     <div class="pcard"><div class="pct-h">Heatmap — räddning % per målzon</div><div class="pgrid">${heatCellsHTML(shots)}</div><div class="pmeta">Grönt = hög räddningsprocent · rött = många insläppta</div></div>
     <div class="pcard"><div class="pct-h">Räddning % per skottläge</div>${barsHTML(groupPct(shots,'pos'))}</div>
     ${intervalRows?`<div class="pcard"><div class="pct-h">Per 10 minuter</div><table class="ptab"><tr><th>Intervall</th><th>Skott</th><th>Räddn</th><th>Mål</th><th>Utanför</th><th>%</th></tr>${intervalRows}</table></div>`:''}
