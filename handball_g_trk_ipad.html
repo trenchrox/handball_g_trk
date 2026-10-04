@@ -339,6 +339,23 @@
   .gk-kind-seg .ha { padding: 9px; font-size: 13px; }
   .bank-scope { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
   .bank-scope select { flex: 1; max-width: 360px; }
+  .bank-tools { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .bank-search { flex: 1; max-width: 420px; background: var(--panel-2); border: 1px solid var(--line);
+    color: var(--ink); padding: 11px 14px; font-size: 15px; border-radius: 0; }
+  .bank-search::placeholder { color: var(--ink-faint); }
+  .viewseg { display: flex; flex-shrink: 0; border: 1px solid var(--line); }
+  .viewseg .vbtn { background: var(--panel-2); color: var(--ink-dim); border: none; width: 42px; height: 42px;
+    font-size: 17px; transition: var(--tap); }
+  .viewseg .vbtn + .vbtn { border-left: 1px solid var(--line); }
+  .viewseg .vbtn.sel { background: var(--accent); color: #1a1a1f; }
+  .team-rows { display: flex; flex-direction: column; }
+  .team-row { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--line);
+    border-bottom: none; background: var(--panel); cursor: pointer; transition: var(--tap); }
+  .team-row:last-child { border-bottom: 1px solid var(--line); }
+  .team-row:active { background: var(--panel-2); }
+  .team-row .tr-main { flex: 1; min-width: 0; }
+  .team-row .tr-name { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .team-row .tr-meta { font-size: 12px; color: var(--ink-dim); margin-top: 2px; }
   .period-list { background: var(--panel-2); color: var(--ink); border: 1px solid var(--line);
     border-radius: 0; padding: 10px 16px; font-size: 13px; font-weight: 600; transition: var(--tap); }
   .period-list:active { transform: scale(0.97); }
@@ -700,13 +717,20 @@
   <button class="navlink" id="resetAllBtn"><span class="ic" data-svg="trash"></span>Nollställ allt</button>
   <button class="navlink" id="themeToggle"><span class="ic" id="themeIcon">☾</span><span id="themeLabel">Mörkt läge</span></button>
   <div class="ctx" id="ctx"></div>
-  <div class="app-version">v1.9</div>
+  <div class="app-version">v2.0</div>
 </nav>
 <main>
 <div class="view" id="vBank">
   <div class="head-row">
     <div><h2><span class="h2-icon" data-svg="book"></span>Lagbank</h2><p class="sub">Motståndarlag med scoutingrapport.</p></div>
     <button class="primary" id="addTeam">+ Nytt lag</button>
+  </div>
+  <div class="bank-tools">
+    <input id="teamSearch" class="bank-search" type="search" placeholder="Sök lag eller spelare…" autocomplete="off">
+    <div class="viewseg" id="bankViewSeg">
+      <button type="button" class="vbtn" data-view="grid" title="Ikonvy" aria-label="Ikonvy">▦</button>
+      <button type="button" class="vbtn" data-view="list" title="Listvy" aria-label="Listvy">☰</button>
+    </div>
   </div>
   <div class="grid" id="teamGrid"></div>
 </div>
@@ -1271,20 +1295,42 @@ function teamInScope(t, sc){
   if(!t.scope) return true; // legacy/unscoped teams show everywhere until assigned
   return t.scope.type===sc.type && t.scope.id===sc.id;
 }
+let bankSearch='';
+function teamMatchesSearch(t, q){
+  if(!q) return true;
+  if((t.name||'').toLowerCase().includes(q)) return true;
+  // also match players in the scouting report
+  return (t.players||[]).some(p=>(p.name||'').toLowerCase().includes(q) || String(p.number||'').toLowerCase().includes(q));
+}
 function renderTeams(){
   const el=document.getElementById('teamGrid');
   // lagbanken är en enda samlad lista med alla lag — ingen tävlingsuppdelning
   const row=document.getElementById('bankScopeRow');
   if(row) row.style.display='none';
-  const list=db.teams.filter(t=>t.id!==db.profileId);
-  if(!list.length){ el.innerHTML='<div class="empty">Inga motståndare än. Tryck "+ Nytt lag".</div>'; return; }
-  el.innerHTML=list.map(t=>{
-    const n=(t.players||[]).length;
-    return `<div class="card click" data-t="${t.id}">
-    <div class="team-line">${teamLogo(t)}
-      <div><div class="title">${esc(t.name)}</div>
-      <div class="meta">${n?n+' spelare i scoutingrapport':'Scoutingrapport'}</div></div></div></div>`;
-  }).join('');
+  const view=(root.bankView==='list')?'list':'grid';
+  // reflect current view on the toggle
+  document.querySelectorAll('#bankViewSeg .vbtn').forEach(b=>b.classList.toggle('sel', b.dataset.view===view));
+  const all=db.teams.filter(t=>t.id!==db.profileId);
+  if(!all.length){ el.className='grid'; el.innerHTML='<div class="empty">Inga motståndare än. Tryck "+ Nytt lag".</div>'; return; }
+  const q=bankSearch.trim().toLowerCase();
+  const list=all.filter(t=>teamMatchesSearch(t,q));
+  if(!list.length){ el.className='grid'; el.innerHTML='<div class="empty">Inga lag matchar "'+esc(bankSearch.trim())+'".</div>'; return; }
+  if(view==='list'){
+    el.className='team-rows';
+    el.innerHTML=list.map(t=>{ const n=(t.players||[]).length;
+      return `<div class="team-row" data-t="${t.id}">${teamLogo(t,'sm')}
+        <div class="tr-main"><div class="tr-name">${esc(t.name)}</div>
+        <div class="tr-meta">${n?n+' spelare i scoutingrapport':'Scoutingrapport'}</div></div></div>`;
+    }).join('');
+  } else {
+    el.className='grid';
+    el.innerHTML=list.map(t=>{ const n=(t.players||[]).length;
+      return `<div class="card click" data-t="${t.id}">
+      <div class="team-line">${teamLogo(t)}
+        <div><div class="title">${esc(t.name)}</div>
+        <div class="meta">${n?n+' spelare i scoutingrapport':'Scoutingrapport'}</div></div></div></div>`;
+    }).join('');
+  }
   el.querySelectorAll('[data-t]').forEach(c=>c.onclick=()=>openScout(c.dataset.t));
 }
 function teamModal(existing, asOwn, newScope){
@@ -1379,6 +1425,10 @@ function goalieEditor(teamObj, existing, onDone){
 document.getElementById('addTeam').onclick=()=>{
   teamModal(null, false, null);
 };
+document.getElementById('teamSearch').oninput=(e)=>{ bankSearch=e.target.value; renderTeams(); };
+document.querySelectorAll('#bankViewSeg .vbtn').forEach(b=>b.onclick=()=>{
+  root.bankView=b.dataset.view; save(); renderTeams();
+});
 function editTeam(id){ teamModal(team(id)); }
 
 /* ----- Scouting report (opponent outfield players) ----- */
