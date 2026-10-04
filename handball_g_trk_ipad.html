@@ -497,12 +497,12 @@
   .faninert { fill: var(--panel-3); stroke: var(--frame); stroke-width: 2.5; opacity: 0.5; }
   .fan-goal { stroke: #ffffff; stroke-width: 4; stroke-linecap: round; }
   body.light .fan-goal { stroke: #b8b8c0; }
-  .fan-specials { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 10px; }
+  .fan-specials { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin-top: 10px; }
   .fan-spec { font-size: 12px; }
-  .fan-mods { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin-top: 8px;
+  .fan-mods { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 8px;
     padding-top: 10px; border-top: 1px solid var(--line); }
-  .fan-mod { font-size: 12px; }
-  .fan-mod.sel { background: transparent; color: var(--accent); border-color: var(--accent);
+  .fan-mod, .fan-break { font-size: 12px; }
+  .fan-mod.sel, .fan-break.sel { background: transparent; color: var(--accent); border-color: var(--accent);
     box-shadow: inset 0 0 0 1px var(--accent); }
   .chips { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 18px; }
   .chip { background: var(--panel-2); color: var(--ink-dim); border: 1px solid var(--line);
@@ -717,7 +717,7 @@
   <button class="navlink" id="resetAllBtn"><span class="ic" data-svg="trash"></span>Nollställ allt</button>
   <button class="navlink" id="themeToggle"><span class="ic" id="themeIcon">☾</span><span id="themeLabel">Mörkt läge</span></button>
   <div class="ctx" id="ctx"></div>
-  <div class="app-version">v2.0</div>
+  <div class="app-version">v2.1</div>
 </nav>
 <main>
 <div class="view" id="vBank">
@@ -1041,7 +1041,7 @@ const POSITIONS = ['Vänster 9m','Höger 9m','Mitt 9m','Vänster kant','Höger k
 // Shot fan: left-to-right wedges (matches the angle toward goal). Values match POSITIONS strings.
 const FAN = ['Vänster kant','Vänster 9m','Mitt 9m','Höger 9m','Höger kant'];
 const FAN_SHORT = ['V kant','V 9m','Mitt 9m','H 9m','H kant'];
-const SPECIAL_POS = ['Kontring','Straff','Genombrott'];   // ömsesidigt uteslutande lägen (varifrån)
+const SPECIAL_POS = ['Kontring','Straff'];   // ömsesidigt uteslutande lägen (varifrån)
 const MODIFIERS = ['Lobb','Studs'];          // kombineras med ett läge (hur)
 const TYPES = ['Långskott','Hoppskott','Underarm','Lobb','Studs','Närkast'];
 const ZONES = ['Övre V','Övre M','Övre H','Mitt V','Mitt M','Mitt H','Nedre V','Nedre M','Nedre H'];
@@ -1923,7 +1923,7 @@ function buildCaptureUI(){
     g.querySelectorAll('.zone').forEach(x=>x.classList.toggle('sel',x===b)); });
   buildShotFan();
   buildShotExtras();
-  pick={zone:null,pos:null,type:null};
+  pick={zone:null,pos:null,type:null,breakthrough:false};
 }
 function buildShotFan(){
   const el=document.getElementById('shotFan');
@@ -1965,7 +1965,8 @@ function buildShotExtras(){
   const specPos=`<div class="fan-specials">`+
     SPECIAL_POS.map(s=>`<button class="chip fan-spec" data-pos="${esc(s)}">${s}</button>`).join('')+`</div>`;
   const mods=`<div class="fan-mods">`+
-    MODIFIERS.map(m=>`<button class="chip fan-mod" data-mod="${esc(m)}">${m}</button>`).join('')+`</div>`;
+    MODIFIERS.map(m=>`<button class="chip fan-mod" data-mod="${esc(m)}">${m}</button>`).join('')+
+    `<button class="chip fan-break" data-break="1">Genombrott</button></div>`;
   el.innerHTML=specPos+mods;
   el.querySelectorAll('.fan-spec').forEach(b=>b.onclick=()=>{ pick.pos=b.dataset.pos;
     document.querySelectorAll('#shotFan .fanw, #shotExtras .fan-spec').forEach(x=>x.classList.remove('sel'));
@@ -1976,6 +1977,9 @@ function buildShotExtras(){
     if(wasSel){ pick.type=null; }
     else { pick.type=b.dataset.mod; b.classList.add('sel'); }
   });
+  // Genombrott is an independent toggle — combines with any position and with Lobb/Studs
+  const bb=el.querySelector('.fan-break');
+  if(bb) bb.onclick=()=>{ pick.breakthrough=!pick.breakthrough; bb.classList.toggle('sel', pick.breakthrough); };
 }
 function chipSet(elId,arr,key){
   const el=document.getElementById(elId);
@@ -1989,12 +1993,13 @@ function commit(outcome){
   if(m.locked){ return; }
   const saved = outcome==='save';
   const shot={id:uid(),t:Date.now(),zone:pick.zone,pos:pick.pos,type:pick.type,saved,shotGk:m.gkId||null,period:m.period||1,clock:matchElapsedSec(m)};
+  if(pick.breakthrough) shot.breakthrough=true;
   if(outcome==='out') shot.out=true;
   m.shots.push(shot);
   save(); refreshBoard(); renderLog(); resetPick();
 }
-function resetPick(){ pick={zone:null,pos:null,type:null};
-  document.querySelectorAll('#goalGrid .zone, #shotFan .fanw, #shotExtras .fan-spec, #shotExtras .fan-mod').forEach(x=>x.classList.remove('sel')); }
+function resetPick(){ pick={zone:null,pos:null,type:null,breakthrough:false};
+  document.querySelectorAll('#goalGrid .zone, #shotFan .fanw, #shotExtras .fan-spec, #shotExtras .fan-mod, #shotExtras .fan-break').forEach(x=>x.classList.remove('sel')); }
 
 function refreshBoard(){
   const m=curMatch(), opp=team(m.oppId);
@@ -2264,7 +2269,7 @@ document.getElementById('showShotList').onclick=()=>{
         const g=s.shotGk?goalie(s.shotGk):(m.gkId?goalie(m.gkId):null);
         const zone=(s.zone!=null)?ZONES[s.zone]:'–';
         const pos=s.pos||'–';
-        const mod=s.type?` · ${esc(s.type)}`:'';
+        const mod=(s.type?` · ${esc(s.type)}`:'')+(s.breakthrough?' · Genombrott':'');
         const time=(s.clock!=null)?`<span class="sl-time">${fmtClock(s.clock)}</span> · `:'';
         const editable=!m.locked;
         return `<div class="sl-row${editable?' sl-edit':''}"${editable?` data-shot="${s.id}"`:''}>
@@ -2335,6 +2340,11 @@ function editShot(m, shotId){
      </div>
      <label class="fld">Skottläge</label><select id="esPos">${posOpts}</select>
      <label class="fld">Variant</label><select id="esMod">${modOpts}</select>
+     <label class="fld">Genombrott</label>
+     <div class="ha-seg" id="esBreak">
+       <button type="button" class="ha${s.breakthrough?' sel':''}" data-br="1">Ja</button>
+       <button type="button" class="ha${s.breakthrough?'':' sel'}" data-br="0">Nej</button>
+     </div>
      <label class="fld">Målzon</label><select id="esZone">${zoneOpts}</select>
      <label class="fld">Målvakt</label><select id="esGk">${gkOpts}</select>
      <button type="button" class="ghost block" id="esDelete" style="margin-top:18px;color:var(--goal);border-color:var(--goal-d)">Ta bort skottet</button>`,
@@ -2346,10 +2356,12 @@ function editShot(m, shotId){
       s.type = sb.querySelector('#esMod').value || null;
       s.zone = parseInt(sb.querySelector('#esZone').value);
       s.shotGk = sb.querySelector('#esGk').value || null;
+      if(sb.querySelector('#esBreak .ha.sel')?.dataset.br==='1') s.breakthrough=true; else delete s.breakthrough;
       save(); refreshBoard(); renderLog();
     });
   sc.querySelector('#mOk').textContent='Spara';
   sc.querySelectorAll('#esOutcome .ha').forEach(b=>b.onclick=()=>sc.querySelectorAll('#esOutcome .ha').forEach(x=>x.classList.toggle('sel',x===b)));
+  sc.querySelectorAll('#esBreak .ha').forEach(b=>b.onclick=()=>sc.querySelectorAll('#esBreak .ha').forEach(x=>x.classList.toggle('sel',x===b)));
   sc.querySelector('#esDelete').onclick=()=>{
     confirmModal('Ta bort det här skottet? Det går inte att ångra.',
       ()=>{ m.shots=m.shots.filter(x=>x.id!==shotId); save(); refreshBoard(); renderLog(); sc.remove(); },
@@ -2852,7 +2864,7 @@ function buildMatchPDF(matchId){
       const g=s.shotGk?goalie(s.shotGk):(mm.gkId?goalie(mm.gkId):null);
       const zone=(s.zone!=null)?ZONES[s.zone]:'–';
       const pos=s.pos||'–';
-      const mod=s.type?' · '+esc(s.type):'';
+      const mod=(s.type?' · '+esc(s.type):'')+(s.breakthrough?' · Genombrott':'');
       const time=(s.clock!=null)?fmtClock(s.clock):'–';
       const oc=s.out?'Utanför':(s.saved?'Räddning':'Mål');
       const ocColor=s.out?'#888':(s.saved?'#1d9e75':'#e2403e');
