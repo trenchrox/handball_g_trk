@@ -700,17 +700,13 @@
   <button class="navlink" id="resetAllBtn"><span class="ic" data-svg="trash"></span>Nollställ allt</button>
   <button class="navlink" id="themeToggle"><span class="ic" id="themeIcon">☾</span><span id="themeLabel">Mörkt läge</span></button>
   <div class="ctx" id="ctx"></div>
-  <div class="app-version">v1.7</div>
+  <div class="app-version">v1.8</div>
 </nav>
 <main>
 <div class="view" id="vBank">
   <div class="head-row">
     <div><h2><span class="h2-icon" data-svg="book"></span>Lagbank</h2><p class="sub">Motståndarlag med scoutingrapport.</p></div>
     <button class="primary" id="addTeam">+ Nytt lag</button>
-  </div>
-  <div class="bank-scope" id="bankScopeRow">
-    <label class="gk-filter-lbl">Visa lag för</label>
-    <select id="bankScope"></select>
   </div>
   <div class="grid" id="teamGrid"></div>
 </div>
@@ -989,7 +985,7 @@
   <details class="help-card">
     <summary><span class="help-ic" data-svg="book"></span><span class="help-h">Lagbank & scoutingrapport</span><span class="help-plus"></span></summary>
     <div class="help-body">
-      <p>I lagbanken samlar du motståndarlagen. Varje lag hör till en <b>tävling</b> — med väljaren <b>Visa lag för</b> överst växlar du mellan dina säsonger och cuper. Den både filtrerar vilka lag som visas och styr vart ett nytt lag hamnar. Praktiskt när samma klubb har flera lag i en cup men bara ett i seriespelet. (Skapa en säsong eller cup först, så finns en tävling att koppla laget till.)</p>
+      <p>I lagbanken samlar du alla motståndarlag i en gemensam lista. Lagen är tillgängliga överallt — när du skapar en match kan du välja vilket lag som helst ur banken, oavsett tävling.</p>
       <p>Klicka på ett lag för att öppna dess <b>scoutingrapport</b>, där du lägger in skyttar med nummer, namn, position, skotthand och anteckning. Klicka på en spelare för att grafiskt registrera var hen sätter bollen — tagga varje träff som <b>skott</b> eller <b>straff</b> så byggs en heatmap upp (gul = få, röd = många).</p>
       <p>Med <b>Kopiera spelare</b> flyttar du över utvalda spelare till ett annat lag (originalet behålls, och placeringarna följer med). Smidigt när samma spelare möter dig både i cupen och i serien.</p>
     </div>
@@ -1277,25 +1273,11 @@ function teamInScope(t, sc){
 }
 function renderTeams(){
   const el=document.getElementById('teamGrid');
-  const comps=allComps();
-  const sel=document.getElementById('bankScope');
+  // lagbanken är en enda samlad lista med alla lag — ingen tävlingsuppdelning
   const row=document.getElementById('bankScopeRow');
-  if(!comps.length){
-    // no comps yet → no scoping possible; show all teams, hide switcher
-    row.style.display='none';
-    cur.bankScope=null;
-  } else {
-    row.style.display='';
-    // default scope to first comp if unset or stale
-    if(!cur.bankScope || !comps.some(c=>c.type===cur.bankScope.type&&c.id===cur.bankScope.id)){
-      cur.bankScope={type:comps[0].type,id:comps[0].id};
-    }
-    sel.innerHTML=comps.map(c=>`<option value="${c.type}:${c.id}">${esc(c.pre)}: ${esc(c.name)}</option>`).join('');
-    sel.value=scopeKey(cur.bankScope);
-    sel.onchange=()=>{ const [type,id]=sel.value.split(':'); cur.bankScope={type,id}; renderTeams(); };
-  }
-  const list=db.teams.filter(t=>t.id!==db.profileId && teamInScope(t, cur.bankScope));
-  if(!list.length){ el.innerHTML='<div class="empty">Inga motståndare i den här tävlingen än. Tryck "+ Nytt lag".</div>'; return; }
+  if(row) row.style.display='none';
+  const list=db.teams.filter(t=>t.id!==db.profileId);
+  if(!list.length){ el.innerHTML='<div class="empty">Inga motståndare än. Tryck "+ Nytt lag".</div>'; return; }
   el.innerHTML=list.map(t=>{
     const n=(t.players||[]).length;
     return `<div class="card click" data-t="${t.id}">
@@ -1318,7 +1300,7 @@ function teamModal(existing, asOwn, newScope){
        <button type="button" class="ghost block" id="gkAdd" style="margin-top:0">+ Lägg till målvakt</button>
      </div>` : '';
   const compsForScope = allComps();
-  const showScopeEdit = !isOwn && existing && compsForScope.length;
+  const showScopeEdit = false; // lagbanken är inte längre uppdelad per tävling
   const scopeEditHtml = showScopeEdit ? `<label class="fld">Tävling</label>
      <select id="teamScope">${compsForScope.map(c=>`<option value="${c.type}:${c.id}" ${existing.scope&&existing.scope.type===c.type&&existing.scope.id===c.id?'selected':''}>${esc(c.pre)}: ${esc(c.name)}</option>`).join('')}</select>` : '';
   const scrim=modal(isOwn?'Min lagprofil':(existing?'Redigera lag':'Nytt lag'),
@@ -1395,8 +1377,7 @@ function goalieEditor(teamObj, existing, onDone){
       sc.querySelector('#gkPhotoPrev').innerHTML=goaliePhoto({name:sc.querySelector('#gkName').value||'?',photo},'lg'); }); };
 }
 document.getElementById('addTeam').onclick=()=>{
-  if(!allComps().length){ infoModal('Skapa en säsong eller cup först — lag i lagbanken hör till en tävling.','Ingen tävling än'); return; }
-  teamModal(null, false, cur.bankScope);
+  teamModal(null, false, null);
 };
 function editTeam(id){ teamModal(team(id)); }
 
