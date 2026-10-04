@@ -426,6 +426,9 @@
   .sl-psum { font-size: 11px; font-weight: 600; color: var(--ink-faint); text-transform: none; letter-spacing: 0; }
   .sl-row { display: flex; align-items: center; gap: 11px; padding: 9px 0; border-bottom: 1px solid var(--line); }
   .sl-row:last-child { border-bottom: none; }
+  .sl-row.sl-edit { cursor: pointer; }
+  .sl-row.sl-edit:active { background: var(--panel-2); }
+  .sl-edit-ic { color: var(--ink-faint); font-size: 13px; flex-shrink: 0; }
   .sl-num { width: 22px; text-align: right; color: var(--ink-faint); font-size: 12px;
     font-family:'Big Shoulders','Instrument Sans',sans-serif; font-weight: 700; flex-shrink: 0; }
   .sl-row .d { width: 9px; height: 9px; border-radius: 0; flex-shrink: 0; }
@@ -574,6 +577,9 @@
     border-radius: 0; width: 30px; height: 30px; font-size: 14px; font-weight: 700; flex-shrink: 0;
     transition: var(--tap); }
   .cardDel:active { transform: scale(0.9); color: var(--goal); border-color: var(--goal-d); }
+  .mc-time { background: var(--panel-2); color: var(--ink-faint); border: 1px solid var(--line);
+    border-radius: 0; width: 30px; height: 30px; font-size: 14px; flex-shrink: 0; transition: var(--tap); }
+  .mc-time:active { transform: scale(0.9); color: var(--accent); border-color: var(--accent); }
   .sp-col { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
   .sp-block { min-width: 0; }
   .sp-typetoggle { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
@@ -694,7 +700,7 @@
   <button class="navlink" id="resetAllBtn"><span class="ic" data-svg="trash"></span>Nollställ allt</button>
   <button class="navlink" id="themeToggle"><span class="ic" id="themeIcon">☾</span><span id="themeLabel">Mörkt läge</span></button>
   <div class="ctx" id="ctx"></div>
-  <div class="app-version">v1.5</div>
+  <div class="app-version">v1.7</div>
 </nav>
 <main>
 <div class="view" id="vBank">
@@ -1621,15 +1627,18 @@ function renderComp(){
         </div>
         <div class="mc-right">
           ${result}
+          ${(m.gkLog&&m.gkLog.some(e=>entrySeconds(e)>0))?`<button class="mc-time" data-edittime="${m.id}" title="Justera speltid">⏱</button>`:''}
           <button class="cardDel" data-delmatch="${m.id}" title="Ta bort match">✕</button>
         </div>
       </div>
       <div class="mc-meta">${m.date||''}${haTag}${kindTag}<span class="mc-dot">·</span>${st.shots} skott<span class="mc-dot">·</span><span class="mc-pct ${st.shots?'good':''}">${st.shots?st.pct+'% räddningar':'– räddningar'}</span></div>
     </div>`;
   }).join('');
-  el.querySelectorAll('[data-m]').forEach(card=>card.onclick=(e)=>{ if(e.target.closest('[data-delmatch]')||e.target.closest('[data-editscore]')) return; openMatch(card.dataset.m); });
+  el.querySelectorAll('[data-m]').forEach(card=>card.onclick=(e)=>{ if(e.target.closest('[data-delmatch]')||e.target.closest('[data-editscore]')||e.target.closest('[data-edittime]')) return; openMatch(card.dataset.m); });
   el.querySelectorAll('[data-editscore]').forEach(b=>b.onclick=(e)=>{ e.stopPropagation();
     const mm=curComp().matches.find(x=>x.id===b.dataset.editscore); if(mm) editScore(mm); });
+  el.querySelectorAll('[data-edittime]').forEach(b=>b.onclick=(e)=>{ e.stopPropagation();
+    const mm=curComp().matches.find(x=>x.id===b.dataset.edittime); if(mm) editPlaytime(mm); });
   el.querySelectorAll('[data-delmatch]').forEach(b=>b.onclick=(e)=>{
     e.stopPropagation();
     const c2=curComp(); const mm=c2.matches.find(x=>x.id===b.dataset.delmatch);
@@ -1661,6 +1670,48 @@ function editScore(m){
       const lv=s.querySelector('#esLeft').value.trim(), rv=s.querySelector('#esRight').value.trim();
       const ls=lv===''?null:Math.max(0,parseInt(lv)||0), rs=rv===''?null:Math.max(0,parseInt(rv)||0);
       m.scoreOwn=home?ls:rs; m.scoreOpp=home?rs:ls;
+      save(); renderComp();
+    });
+  sc.querySelector('#mOk').textContent='Spara';
+}
+function editPlaytime(m){
+  if(m.locked){ infoModal('Matchen är låst. Lås upp den först för att justera speltid.', 'Låst'); return; }
+  // ensure the on-field goalie (not yet logged) appears as an editable row too
+  if(!m.gkLog) m.gkLog=[];
+  if(m.gkId && !m.gkLog.some(e=>e.gkId===m.gkId)){
+    const liveSecs=Math.max(0, matchElapsedSec(m)-(m.gkInClock||0));
+    m.gkLog.push({gkId:m.gkId, name:goalie(m.gkId)?.name||'', seconds:liveSecs});
+    m.gkInClock=matchElapsedSec(m); // the pushed entry now holds that time
+  }
+  const allGks=goalies();
+  if(!m.gkLog.length){ infoModal('Ingen speltid registrerad för den här matchen än.', 'Speltid'); return; }
+  const gkOptions=(selId)=>allGks.map(g=>`<option value="${g.id}"${g.id===selId?' selected':''}>${(g.number!==undefined&&g.number!=='')?'#'+esc(String(g.number))+' ':''}${esc(g.name)}</option>`).join('');
+  const rows=m.gkLog.map((e,i)=>{ const sec=entrySeconds(e);
+    return `<div class="pt-row" data-i="${i}" style="border-bottom:1px solid var(--line);padding:0 0 14px;margin-bottom:14px">
+      <label class="fld" style="margin-top:0">Målvakt</label>
+      <select class="pt-gk">${gkOptions(e.gkId)}</select>
+      <div style="display:flex;gap:12px;margin-top:10px">
+        <div style="flex:1"><label class="fld">Minuter</label><input class="pt-min" type="number" inputmode="numeric" min="0" max="120" value="${Math.floor(sec/60)}"></div>
+        <div style="flex:1"><label class="fld">Sekunder</label><input class="pt-sec" type="number" inputmode="numeric" min="0" max="59" value="${sec%60}"></div>
+      </div>
+    </div>`;
+  }).join('');
+  const sc=modal('Justera speltid',
+    `<p style="color:var(--ink-dim);font-size:14px;margin:0 0 16px;line-height:1.5">Ändra tiden eller byt vilken målvakt tiden tillhör. Två rader på samma målvakt slås ihop.</p>${rows}`,
+    s=>{
+      const newLog=[];
+      s.querySelectorAll('.pt-row').forEach(row=>{
+        const gkId=row.querySelector('.pt-gk').value;
+        const mm=Math.max(0,parseInt(row.querySelector('.pt-min').value)||0);
+        const ss=Math.min(59,Math.max(0,parseInt(row.querySelector('.pt-sec').value)||0));
+        const secs=mm*60+ss;
+        const g=goalie(gkId);
+        // merge entries that end up on the same goalie
+        const existing=newLog.find(x=>x.gkId===gkId);
+        if(existing){ existing.seconds+=secs; }
+        else newLog.push({gkId, name:g?g.name:'', seconds:secs});
+      });
+      m.gkLog=newLog;
       save(); renderComp();
     });
   sc.querySelector('#mOk').textContent='Spara';
@@ -2184,12 +2235,14 @@ document.getElementById('showShotList').onclick=()=>{
         const pos=s.pos||'–';
         const mod=s.type?` · ${esc(s.type)}`:'';
         const time=(s.clock!=null)?`<span class="sl-time">${fmtClock(s.clock)}</span> · `:'';
-        return `<div class="sl-row">
+        const editable=!m.locked;
+        return `<div class="sl-row${editable?' sl-edit':''}"${editable?` data-shot="${s.id}"`:''}>
           <span class="sl-num">${i+1}</span>
           <span class="d ${outcomeClass(s)}"></span>
           <div class="sl-main"><div class="sl-line1">${esc(pos)}${mod} → ${esc(zone)}</div>
             <div class="sl-line2">${time}${g?esc(g.name):'—'}</div></div>
           <span class="sl-out ${outcomeClass(s)}">${outcomeLabel(s)}</span>
+          ${editable?'<span class="sl-edit-ic">✎</span>':''}
         </div>`;
       }).join('');
     });
@@ -2220,14 +2273,58 @@ document.getElementById('showShotList').onclick=()=>{
       }).join('')+
       `<div class="sl-int-legend"><span><b class="s">●</b> räddn</span><span><b class="g">●</b> mål</span><span>(utanför)</span></div></div>`;
   }
+  const hint = (m.shots.length && !m.locked) ? '<p class="meta" style="text-align:center;margin:0 0 10px;font-size:12px">Tryck på ett skott för att ändra eller ta bort det.</p>' : '';
   scrim.innerHTML=`<div class="modal sl-modal">
     <h3>Skottlista — ${esc(opp?.name||'match')}</h3>
+    ${hint}
     <div class="sl-list">${intervals}${body}</div>
     <button class="ghost block" id="slClose">Stäng</button></div>`;
   document.body.appendChild(scrim);
   scrim.querySelector('#slClose').onclick=()=>scrim.remove();
   scrim.onclick=e=>{ if(e.target===scrim) scrim.remove(); };
+  scrim.querySelectorAll('[data-shot]').forEach(row=>row.onclick=()=>{
+    scrim.remove();
+    editShot(m, row.dataset.shot);
+  });
 };
+function editShot(m, shotId){
+  if(m.locked){ infoModal('Matchen är låst. Lås upp den först för att ändra skott.', 'Låst'); return; }
+  const s=m.shots.find(x=>x.id===shotId); if(!s) return;
+  const outcome = s.out?'out':(s.saved?'save':'goal');
+  const posOpts=[...FAN,...SPECIAL_POS].map(p=>`<option value="${esc(p)}"${s.pos===p?' selected':''}>${esc(p)}</option>`).join('');
+  const zoneOpts=ZONES.map((z,i)=>`<option value="${i}"${s.zone===i?' selected':''}>${esc(z)}</option>`).join('');
+  const modOpts=['<option value="">—</option>'].concat(MODIFIERS.map(md=>`<option value="${esc(md)}"${s.type===md?' selected':''}>${esc(md)}</option>`)).join('');
+  const gkOpts=goalies().map(g=>`<option value="${g.id}"${(s.shotGk||m.gkId)===g.id?' selected':''}>${(g.number!==undefined&&g.number!=='')?'#'+esc(String(g.number))+' ':''}${esc(g.name)}</option>`).join('');
+  const sc=modal('Ändra skott',
+    `<label class="fld" style="margin-top:0">Utfall</label>
+     <div class="ha-seg" id="esOutcome">
+       <button type="button" class="ha${outcome==='save'?' sel':''}" data-oc="save">Räddning</button>
+       <button type="button" class="ha${outcome==='goal'?' sel':''}" data-oc="goal">Mål</button>
+       <button type="button" class="ha${outcome==='out'?' sel':''}" data-oc="out">Utanför</button>
+     </div>
+     <label class="fld">Skottläge</label><select id="esPos">${posOpts}</select>
+     <label class="fld">Variant</label><select id="esMod">${modOpts}</select>
+     <label class="fld">Målzon</label><select id="esZone">${zoneOpts}</select>
+     <label class="fld">Målvakt</label><select id="esGk">${gkOpts}</select>
+     <button type="button" class="ghost block" id="esDelete" style="margin-top:18px;color:var(--goal);border-color:var(--goal-d)">Ta bort skottet</button>`,
+    sb=>{
+      const oc=sb.querySelector('#esOutcome .ha.sel')?.dataset.oc||outcome;
+      s.saved = oc==='save';
+      if(oc==='out') s.out=true; else delete s.out;
+      s.pos = sb.querySelector('#esPos').value;
+      s.type = sb.querySelector('#esMod').value || null;
+      s.zone = parseInt(sb.querySelector('#esZone').value);
+      s.shotGk = sb.querySelector('#esGk').value || null;
+      save(); refreshBoard(); renderLog();
+    });
+  sc.querySelector('#mOk').textContent='Spara';
+  sc.querySelectorAll('#esOutcome .ha').forEach(b=>b.onclick=()=>sc.querySelectorAll('#esOutcome .ha').forEach(x=>x.classList.toggle('sel',x===b)));
+  sc.querySelector('#esDelete').onclick=()=>{
+    confirmModal('Ta bort det här skottet? Det går inte att ångra.',
+      ()=>{ m.shots=m.shots.filter(x=>x.id!==shotId); save(); refreshBoard(); renderLog(); sc.remove(); },
+      {title:'Ta bort skott', yes:'Ta bort', danger:true});
+  };
+}
 
 document.getElementById('matchExportBtn').onclick=()=>{
   const m=curMatch(); if(!m) return;
