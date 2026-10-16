@@ -717,13 +717,16 @@
   <button class="navlink" id="resetAllBtn"><span class="ic" data-svg="trash"></span>Nollställ allt</button>
   <button class="navlink" id="themeToggle"><span class="ic" id="themeIcon">☾</span><span id="themeLabel">Mörkt läge</span></button>
   <div class="ctx" id="ctx"></div>
-  <div class="app-version">v2.3</div>
+  <div class="app-version">v2.4</div>
 </nav>
 <main>
 <div class="view" id="vBank">
   <div class="head-row">
     <div><h2><span class="h2-icon" data-svg="book"></span>Lagbank</h2><p class="sub">Motståndarlag med scoutingrapport.</p></div>
-    <button class="primary" id="addTeam">+ Nytt lag</button>
+    <div style="display:flex;gap:10px">
+      <button class="ghost" id="importTeams">⧉ Hämta lag</button>
+      <button class="primary" id="addTeam">+ Nytt lag</button>
+    </div>
   </div>
   <div class="bank-tools">
     <input id="teamSearch" class="bank-search" type="search" placeholder="Sök lag eller spelare…" autocomplete="off">
@@ -1425,6 +1428,57 @@ function goalieEditor(teamObj, existing, onDone){
 document.getElementById('addTeam').onclick=()=>{
   teamModal(null, false, null);
 };
+document.getElementById('importTeams').onclick=openImportTeams;
+function openImportTeams(){
+  const here=activeClub(); if(!here) return;
+  const others=(root.clubs||[]).filter(c=>c.id!==here.id);
+  if(!others.length){ infoModal('Du har bara ett lag. Skapa fler lagprofiler via profilkortet uppe till vänster, så kan du hämta motståndare mellan dem.','Hämta lag'); return; }
+  // existing opponent names in the current bank (to skip duplicates), case-insensitive
+  const existingNames=new Set((here.teams||[]).filter(t=>!t.own).map(t=>(t.name||'').toLowerCase().trim()));
+  const clubOpts=others.map((c,i)=>`<option value="${c.id}">${esc(c.name)}${c.ageGroup?' ('+esc(c.ageGroup)+')':''}</option>`).join('');
+  const sc=modal('Hämta lag från annat lag',
+    `<p style="color:var(--ink-dim);font-size:14px;margin:0 0 14px;line-height:1.5">Kopierar namn och logga från ett annat av dina lag. Scoutingrapporten börjar tom — spelarna stannar i sitt ursprungslag.</p>
+     <label class="fld" style="margin-top:0">Hämta från</label>
+     <select id="impSrc">${clubOpts}</select>
+     <div style="display:flex;gap:10px;margin:14px 0 8px">
+       <button type="button" class="ghost" id="impAll" style="flex:1">Markera alla</button>
+       <button type="button" class="ghost" id="impNone" style="flex:1">Avmarkera alla</button>
+     </div>
+     <div id="impList" style="display:flex;flex-direction:column;gap:2px;max-height:300px;overflow:auto"></div>`,
+    s=>{
+      const srcId=s.querySelector('#impSrc').value;
+      const src=root.clubs.find(c=>c.id===srcId); if(!src) return;
+      const checked=[...s.querySelectorAll('.imp-cb:checked')].map(cb=>cb.value);
+      if(!checked.length){ infoModal('Inga lag valda.','Hämta lag'); return false; }
+      let added=0;
+      checked.forEach(tid=>{
+        const t=(src.teams||[]).find(x=>x.id===tid); if(!t) return;
+        if(existingNames.has((t.name||'').toLowerCase().trim())) return; // skip dupes
+        here.teams.push({ id:uid(), name:t.name, logo:t.logo||null, color:t.color||COLORS[0] });
+        existingNames.add((t.name||'').toLowerCase().trim());
+        added++;
+      });
+      save(); renderTeams();
+      infoModal(added?(added+(added===1?' lag hämtat.':' lag hämtade.')):'Inga nya lag lades till (fanns redan).','Klart');
+    });
+  sc.querySelector('#mOk').textContent='Hämta';
+  const listEl=sc.querySelector('#impList');
+  const renderImpList=()=>{
+    const src=root.clubs.find(c=>c.id===sc.querySelector('#impSrc').value);
+    const opp=(src?.teams||[]).filter(t=>!t.own);
+    if(!opp.length){ listEl.innerHTML='<div class="meta">Det laget har inga motståndare i sin lagbank.</div>'; return; }
+    listEl.innerHTML=opp.map(t=>{
+      const dupe=existingNames.has((t.name||'').toLowerCase().trim());
+      return `<label class="pickrow" style="display:flex;align-items:center;gap:10px;cursor:pointer;${dupe?'opacity:0.5':''}">
+        <input type="checkbox" class="imp-cb" value="${t.id}" ${dupe?'disabled':'checked'} style="width:auto;margin:0">
+        ${teamLogo(t,'sm')}<span style="flex:1">${esc(t.name)}${dupe?' <span class="meta">(finns redan)</span>':''}</span></label>`;
+    }).join('');
+  };
+  sc.querySelector('#impSrc').onchange=renderImpList;
+  sc.querySelector('#impAll').onclick=()=>listEl.querySelectorAll('.imp-cb:not(:disabled)').forEach(cb=>cb.checked=true);
+  sc.querySelector('#impNone').onclick=()=>listEl.querySelectorAll('.imp-cb').forEach(cb=>cb.checked=false);
+  renderImpList();
+}
 document.getElementById('teamSearch').oninput=(e)=>{ bankSearch=e.target.value; renderTeams(); };
 document.querySelectorAll('#bankViewSeg .vbtn').forEach(b=>b.onclick=()=>{
   root.bankView=b.dataset.view; save(); renderTeams();
