@@ -717,7 +717,7 @@
   <button class="navlink" id="resetAllBtn"><span class="ic" data-svg="trash"></span>Nollställ allt</button>
   <button class="navlink" id="themeToggle"><span class="ic" id="themeIcon">☾</span><span id="themeLabel">Mörkt läge</span></button>
   <div class="ctx" id="ctx"></div>
-  <div class="app-version">v2.1</div>
+  <div class="app-version">v2.2</div>
 </nav>
 <main>
 <div class="view" id="vBank">
@@ -2704,7 +2704,7 @@ function heatCellsHTML(shots){
 }
 function barsHTML(rows){
   if(!rows.length) return '<div class="pmeta">Ingen data.</div>';
-  return rows.map(r=>`<div class="pbar"><span class="pbl">${esc(r.k)}</span><span class="pbt"><span class="pbf" style="width:${r.pct}%"></span></span><span class="pbn">${r.pct}% <small>(${r.saves}/${r.shots})</small></span></div>`).join('');
+  return rows.map(r=>`<div class="pbar"><span class="pbl">${esc(r.k)}</span><span class="pbt"><span class="pbf" style="width:${r.pct}%;background:${pctColor(r.pct)}"></span></span><span class="pbn">${r.pct}% <small>(${r.saves}/${r.shots})</small></span></div>`).join('');
 }
 function buildGoaliePDF(gkId, matchIds, sects, summaryOnly){
   const g=goalie(gkId); const me=ownTeam();
@@ -3004,11 +3004,17 @@ function renderCompare(){
           <div class="heat-frame" style="max-width:none"><div class="heat-grid">${heat(shotsB)}</div></div></div>
       </div></div>`;
 }
+// Same red→green scale as the heatmap: 0% = red, 100% = green.
+function pctColor(pct){
+  const h=Math.max(0,Math.min(100,pct));
+  const r=Math.round(240-(h/100)*200), g=Math.round(80+(h/100)*132), b=Math.round(110-(h/100)*30);
+  return `rgb(${r},${g},${b})`;
+}
 function renderBars(elId,rows){
   const el=document.getElementById(elId);
   if(!rows.length){ el.innerHTML='<div class="meta">Ingen data än.</div>'; return; }
   el.innerHTML=rows.map(r=>`<div class="bar-row"><span class="name">${esc(r.k)}</span>
-    <span class="bar-track"><span class="bar-fill" style="width:${r.pct}%"></span></span>
+    <span class="bar-track"><span class="bar-fill" style="width:${r.pct}%;background:${pctColor(r.pct)}"></span></span>
     <span class="val">${r.pct}% (${r.saves}/${r.shots})</span></div>`).join('');
 }
 function exportBackup(){
