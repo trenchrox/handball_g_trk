@@ -106,45 +106,46 @@ Migreringar som redan finns:
 
 Backupfilen är `JSON.stringify(root)` (filnamn `handboll-tracker-backup-ÅÅÅÅ-MM-DD.json`). Den har **inget eget versionsfält**.
 
-## Inloggning / PIN
+## Inloggning
 
-**Det finns ingen PIN och ingen riktig inloggning i koden.** Jag sökte efter `pin`, `lösenord`, `password`, kryptering och hashning utan träff.
+Appen har **ingen PIN och ingen inloggning**, och det är avsiktligt. `#login` är bara en onboarding-skärm ("Skapa din lagprofil" eller "Återställ från backup").
 
-- `#login` är en onboarding-skärm: "Skapa din lagprofil" med klubbnamn, ålderskull och valfri logga, eller "Återställ från backup".
-- `boot()` visar login bara om `activeClub()` saknas, dvs. om det inte finns någon klubb i IndexedDB. Annars anropas `enterApp()` direkt.
-- Det finns alltså ingen låsning vid appstart. Den som har enheten kommer in.
-- Att "Nollställ allt" skickar tillbaka till login-skärmen är det enda sambandet med "inloggning".
-- **Osäkert:** Du nämnde PIN i uppgiften. Om en PIN ska finnas (eller fanns i en tidigare version som inte ligger i repot) är den inte implementerad här. Lås-ikonerna (`#lockBtn`, `.mc-lock`, `.lockbadge`) gäller **låsning av en match** (`m.locked`), inte appåtkomst.
+- `boot()` visar den bara om `activeClub()` saknas, dvs. om det inte finns någon klubb i IndexedDB. Annars anropas `enterApp()` direkt.
+- Lås-ikonerna (`#lockBtn`, `.mc-lock`, `.lockbadge`) gäller låsning av en match (`m.locked`), inte appåtkomst.
+- Lägg inte till PIN eller lösenord utan att användaren ber om det.
 
 ## Versionering
 
-- Appversionen står **hårdkodad på ett enda ställe**: `<div class="app-version">v2.4</div>` i sidomenyn (rad ~720). Nuvarande version är **v2.4**.
-- Det finns ingen konstant i scriptet, ingen automatisk uppräkning och inget versionsfält i datat eller backupen.
-- Versionen räknas alltså upp **manuellt** genom att den texten ändras.
-- Versionsnumret är inte kopplat till `CACHE_NAME` i `sw.js` (se nedan). De hålls inte synkade av något.
-- **Osäkert:** Jag vet inte vilken regel som använts för att räkna upp (t.ex. vad som ger ny minor respektive major). Git-historiken består bara av "Add files via upload" och säger inget om det. Fråga användaren innan en konvention antas.
+- Versionen står i **en enda konstant**: `const APP_VERSION = '2.5'` överst i scriptet i `handball_g_trk_ipad.html`. Den visas i sidomenyn (`#appVersion`, som `v2.5`) och styr service workerns cache (se nedan). Ändra den inte på något annat ställe.
+- **Regel:**
+  - **Andra siffran höjs** vid nya funktioner och fixar (2.4 → 2.5).
+  - **Första siffran höjs** när IndexedDB-datamodellen ändras (2.x → 3.0). Då krävs **alltid en migrering** av befintlig data (`normalizeRoot()` och/eller en riktig `onupgradeneeded`).
+- **Höj alltid versionen vid varje ändring av `handball_g_trk_ipad.html`.** Utan ny version får användarna inte den nya filen (se cache nedan).
+- **Teambuilder** (en annan app) använder hela versioner (v1, v2, ...). Reglerna skiljer sig alltså mellan apparna. Använd inte Teambuilders schema här.
+- Backupfilen och datat har inget eget versionsfält.
 
 ## Service worker (`sw.js`)
 
-- **Cachenamn:** `CACHE_NAME = 'handboll-tracker-v1'`. Det står hårdkodat och har inte ändrats trots att appen är på v2.4.
-- **Förcachas vid install** (`FILES_TO_CACHE`): `./handball_g_trk_ipad.html` och `./manifest.json`. `sw.js` själv cachas inte i listan.
+- **Cachenamn:** `handboll-tracker-v` + `APP_VERSION`, t.ex. `handboll-tracker-v2.5`. Versionen läses ur `sw.js`:s egen URL. HTML-filen registrerar `sw.js?v=<APP_VERSION>`. Ny version ger alltså ny URL, en ny service worker och en ny cache. **Ändra aldrig versionen i `sw.js`.** Där finns ingen hårdkodad version. Saknas `?v=` används `0`.
+- **Förcachas vid install** (`FILES_TO_CACHE`): `./handball_g_trk_ipad.html` och `./manifest.json`, hämtade med `cache: 'reload'` så att webbläsarens HTTP-cache inte ger en gammal fil. `sw.js` själv cachas inte.
 - **install:** `cache.addAll(...)` och sedan `self.skipWaiting()`.
-- **activate:** raderar alla cacher vars namn **inte** är lika med `CACHE_NAME`, och anropar sedan `clients.claim()`.
-- **fetch:** *cache-first*. Om svaret finns i cachen returneras det. Annars hämtas det från nätet, en kopia läggs i cachen med `cache.put` (så all hämtad GET-resurs cachas, även sådant som inte står i listan), och vid nätfel returneras den cachade huvudsidan.
-- Registreras i HTML-filen med `navigator.serviceWorker.register('sw.js')` vid `window load`.
+- **activate:** raderar bara Cache API-cacher vars namn börjar med `handboll-tracker-v` och inte är den aktuella, och anropar sedan `clients.claim()`. **Det rör aldrig IndexedDB eller localStorage.** Koden använder bara `caches.keys()` och `caches.delete()`, så användarnas data påverkas inte av en ny version.
+- **fetch:** *cache-first*. Hittas svaret i cachen returneras det. Annars hämtas det från nätet och en kopia läggs i den aktuella cachen. Vid nätfel returneras den cachade huvudsidan.
+- **Följd:** eftersom fetch är cache-first måste versionen höjas för att ändrad HTML ska nå användarna (se Versionering).
 
-**Viktig konsekvens:** Eftersom fetch är cache-first och `CACHE_NAME` är oförändrat, får användare **inte** en uppdaterad HTML-fil när den ändras i repot. De ser den gamla cachade versionen tills cachenamnet byts (eller cachen rensas). **Vid varje ändring av `handball_g_trk_ipad.html` som ska nå användare måste `CACHE_NAME` räknas upp** (t.ex. `handboll-tracker-v2`). Det görs idag inte automatiskt.
+## Servering
+
+- Appen serveras från GitHub Pages ur det här repot (`trenchrox/handball_g_trk`).
+- **Byt aldrig namn på repot eller på `handball_g_trk_ipad.html`.** IndexedDB och service worker är knutna till adressen (origin och sökväg) på varje iPad. Ändras adressen ser användarna en tom app och förlorar tillgång till sin data.
+- Den exakta adressen är inte angiven av användaren och står inte i repot. Fyll i den här när den är känd: `[adress]`.
+- `manifest.json` (`start_url`) pekar på filnamnet och ska inte ändras. `icons: []` lämnas som det är tills vidare.
 
 ## Osäkerheter och saker att kontrollera
 
-- **PIN:** finns inte i koden (se ovan). Oklart om det är ett missförstånd eller en funktion som saknas.
-- **Versionsregel:** oklart hur `v2.4` ska räknas upp.
-- **Cache-version vs appversion:** `v1` i `sw.js` mot `v2.4` i appen. Oklart om det är medvetet. Troligen en miss.
-- **Hosting:** repot visar inte var appen serveras ifrån (inga GitHub Pages-inställningar, ingen workflow-fil, ingen `.github`-mapp). Oklart om användarna kör den via Pages, som lokal fil eller på annat sätt. Det avgör hur uppdateringar når enheterna.
-- **Ikoner:** `manifest.json` har `icons: []`, så ingen hemskärmsikon definieras där. Oklart om det är avsiktligt (appen kan ha `apple-touch-icon` eller liknande, det har jag inte kontrollerat).
 - **Datafälten ovan** är härledda från de ställen som skapar objekt (`newComp`, `commit`, `teamModal`, `playerEditor`, `goalieEditor`). Det kan finnas fler valfria fält som sätts på andra ställen. Läs koden för respektive fält innan du förlitar dig på listan.
 - **Radnummer** i detta dokument är ungefärliga.
 - **Tester:** det finns inga automatiska tester, ingen lint-konfiguration och ingen CI.
+- **Uppdatering hos användare:** nytt cachenamn tas i bruk när webbläsaren upptäcker den ändrade `sw.js?v=`-URL:en vid nästa besök. En iPad som varit offline får uppdateringen först efter ett besök online. Jag har bara provat det i Chromium lokalt (cache skapas med rätt namn, ingen konsolfel), inte på en iPad.
 
 ## Arbetssätt
 
