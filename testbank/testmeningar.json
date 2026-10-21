@@ -1,0 +1,513 @@
+{
+  "beskrivning": "Testbänk för analysmodellen. Uppmärkta meningar ur riktiga matchrapporter. Spelarnamn ersatta med [SPELARE]. Uppgifter om hälsa, mat och familj är borttagna. Rätta etiketterna innan användning.",
+  "utfall": [
+    "behov",
+    "styrka",
+    "kontext",
+    "spelare"
+  ],
+  "omraden": {
+    "anfall_fart": "Anfall: fart, djup, gå på mål, följa med i rörelsen",
+    "anfall_bredd": "Anfall: bredd, spelvändning, hitta inspring och fria ytor",
+    "forsvar_aggressivitet": "Försvar: aggressivitet, timing, kliva ut i tid",
+    "forsvar_linje": "Försvar mot linjespel och inspel till linjen",
+    "forsvar_distans": "Försvar mot distansskott och skyttar, t.ex. vänsternio",
+    "forsvar_struktur": "Försvar: struktur, styra till kant, tvinga fram passivt spel",
+    "bollhantering": "Bollhantering, bolltapp, tekniska fel",
+    "malvakt": "Målvaktsspel",
+    "installning": "Inställning, kämpaglöd, lyssna, hålla ihop",
+    "kontringsforsvar": "Omställning till försvar: springa hem efter eget avslut eller bolltapp",
+    "forsvar_press": "Försvar: pressa högt, offensivt försvar",
+    "matchstart_fokus": "Matchstart, fokus och inställning: komma igång, inte fastna i det man inte kan påverka",
+    "fysik": "Fysik och ork över hela matchen"
+  },
+  "meningar": [
+    {
+      "rapport": "A",
+      "match": "Skurup",
+      "text": "Skurup är stora och har en väldigt lång linje som är svår att stoppa.",
+      "utfall": "behov",
+      "omrade": "forsvar_linje",
+      "osaker": true,
+      "kommentar": "Beskriver motståndaren men pekar på eget behov"
+    },
+    {
+      "rapport": "A",
+      "match": "Skurup",
+      "text": "[SPELARE] kämpade på bra med henne i början.",
+      "utfall": "spelare",
+      "omrade": null
+    },
+    {
+      "rapport": "A",
+      "match": "Skurup",
+      "text": "Vi hade ett ok försvar",
+      "utfall": "styrka",
+      "omrade": "forsvar_struktur",
+      "osaker": true
+    },
+    {
+      "rapport": "A",
+      "match": "Skurup",
+      "text": "men är för snälla och vi kliver in i situationerna lite sent för att kunna stoppa dom.",
+      "utfall": "behov",
+      "omrade": "forsvar_aggressivitet"
+    },
+    {
+      "rapport": "A",
+      "match": "Skurup",
+      "text": "Men vi jobbar upp oss och blir lite lite tuffare i andra halvlek.",
+      "utfall": "styrka",
+      "omrade": "forsvar_aggressivitet",
+      "osaker": true
+    },
+    {
+      "rapport": "A",
+      "match": "Skurup",
+      "text": "Framåt är vi väldigt stillastående, ingen som vill ta läget riktigt.",
+      "utfall": "behov",
+      "omrade": "anfall_fart"
+    },
+    {
+      "rapport": "A",
+      "match": "Skurup",
+      "text": "Vi hade en eller två spelare som kommer i fart men problemet är att nästa inte gör det och då blir arbetet från den första spelaren ogjort.",
+      "utfall": "behov",
+      "omrade": "anfall_fart"
+    },
+    {
+      "rapport": "A",
+      "match": "Skurup",
+      "text": "Men vi samlar oss och får ett par måls försprång som vi behåller och vinner matchen.",
+      "utfall": "styrka",
+      "omrade": "installning"
+    },
+    {
+      "rapport": "A",
+      "match": "Skurup",
+      "text": "[SPELARE] och [SPELARE] är inte riktigt nivå 2 spelare, det syntes ganska tydligt idag.",
+      "utfall": "spelare",
+      "omrade": null
+    },
+    {
+      "rapport": "A",
+      "match": "Skurup",
+      "text": "Det som är bra med [SPELARE] är att hon gör det som man säger till henne att göra, hon lyssnar.",
+      "utfall": "spelare",
+      "omrade": null
+    },
+    {
+      "rapport": "A",
+      "match": "Skurup",
+      "text": "Ska tilläggas att Skurup hade 5 spelare med som är födda 2013.",
+      "utfall": "kontext",
+      "omrade": null
+    },
+    {
+      "rapport": "A",
+      "match": "Sölvesborg",
+      "text": "[SPELARE] gör sin första match, hon va supernervös men gör det så bra.",
+      "utfall": "spelare",
+      "omrade": null
+    },
+    {
+      "rapport": "A",
+      "match": "Sölvesborg",
+      "text": "[SPELARE] dök inte upp, dom sjukanmälde henne i chatten.",
+      "utfall": "kontext",
+      "omrade": null,
+      "kommentar": "Frånvaro: ska aldrig sparas i analysen"
+    },
+    {
+      "rapport": "A",
+      "match": "Sölvesborg",
+      "text": "Under matchens gång kan inte [SPELARE] spela, [SPELARE] får ont och [SPELARE] byter ut sig från mål.",
+      "utfall": "kontext",
+      "omrade": null,
+      "kommentar": "Skada: ska aldrig sparas i analysen"
+    },
+    {
+      "rapport": "A",
+      "match": "Sölvesborg",
+      "text": "När vi ligger under med 10 mål så skriver vi in samtliga tre i matchen.",
+      "utfall": "kontext",
+      "omrade": null
+    },
+    {
+      "rapport": "A",
+      "match": "Sölvesborg",
+      "text": "Sölvesborg är inget nivå tre lag.",
+      "utfall": "kontext",
+      "omrade": null
+    },
+    {
+      "rapport": "A",
+      "match": "Sölvesborg",
+      "text": "Dom har en bra målvakt och dom har ett par duktiga skyttar som skjuter bra och som även hittar inspel till linjen.",
+      "utfall": "behov",
+      "omrade": "forsvar_distans",
+      "osaker": true,
+      "kommentar": "Kan även vara forsvar_linje"
+    },
+    {
+      "rapport": "A",
+      "match": "Sölvesborg",
+      "text": "Vi räcker inte till vare sig framåt eller bakåt.",
+      "utfall": "kontext",
+      "omrade": null,
+      "osaker": true,
+      "kommentar": "För allmän för ett område"
+    },
+    {
+      "rapport": "A",
+      "match": "Sölvesborg",
+      "text": "Återigen väldigt stillastående och ingen som riktigt går på mål.",
+      "utfall": "behov",
+      "omrade": "anfall_fart"
+    },
+    {
+      "rapport": "A",
+      "match": "Sölvesborg",
+      "text": "Men dom kämpar på.",
+      "utfall": "styrka",
+      "omrade": "installning"
+    },
+    {
+      "rapport": "A",
+      "match": "HK Heart",
+      "text": "HK Heart spelar väldigt oskolad handboll, men dom har ett gäng spelare som är duktiga och skjuter riktiga kanonskott.",
+      "utfall": "behov",
+      "omrade": "forsvar_distans",
+      "osaker": true
+    },
+    {
+      "rapport": "A",
+      "match": "HK Heart",
+      "text": "Tjejerna kämpar på så bra, och vi är riktigt nära att komma ikapp.",
+      "utfall": "styrka",
+      "omrade": "installning"
+    },
+    {
+      "rapport": "A",
+      "match": "HK Heart",
+      "text": "Men vi är för försiktiga i försvaret",
+      "utfall": "behov",
+      "omrade": "forsvar_aggressivitet"
+    },
+    {
+      "rapport": "A",
+      "match": "HK Heart",
+      "text": "och sen slarvar vi bort ett par bollar i ett skede när vi hade kunnat vända.",
+      "utfall": "behov",
+      "omrade": "bollhantering"
+    },
+    {
+      "rapport": "A",
+      "match": null,
+      "text": "Jag tycker båda dessa matcherna visar att det är tufft i nivå tre och att dessa lagen lagt sig i fel serie.",
+      "utfall": "kontext",
+      "omrade": null
+    },
+    {
+      "rapport": "B",
+      "match": "Höör",
+      "text": "Försvaret var mycket bra.",
+      "utfall": "styrka",
+      "omrade": "forsvar_struktur"
+    },
+    {
+      "rapport": "B",
+      "match": "Höör",
+      "text": "Vi lyckades nästan hela matchen hålla dem till kantskott.",
+      "utfall": "styrka",
+      "omrade": "forsvar_struktur"
+    },
+    {
+      "rapport": "B",
+      "match": "Höör",
+      "text": "[SPELARE] och [SPELARE] i mål skötte sig utmärkt.",
+      "utfall": "styrka",
+      "omrade": "malvakt"
+    },
+    {
+      "rapport": "B",
+      "match": "Höör",
+      "text": "Tog de bollar de hann fram till.",
+      "utfall": "styrka",
+      "omrade": "malvakt"
+    },
+    {
+      "rapport": "B",
+      "match": "Höör",
+      "text": "Höör är väldigt bra på att avsluta.",
+      "utfall": "kontext",
+      "omrade": null
+    },
+    {
+      "rapport": "B",
+      "match": "Höör",
+      "text": "[SPELARE] rev ner eftermiddagens största jubel med en kickräddning på ett friläge.",
+      "utfall": "spelare",
+      "omrade": null
+    },
+    {
+      "rapport": "B",
+      "match": "Höör",
+      "text": "Framåt var [SPELARE] on fire.",
+      "utfall": "spelare",
+      "omrade": null
+    },
+    {
+      "rapport": "B",
+      "match": "Höör",
+      "text": "I anfallet behöver vi mer fart",
+      "utfall": "behov",
+      "omrade": "anfall_fart"
+    },
+    {
+      "rapport": "B",
+      "match": "Höör",
+      "text": "och titta VÄNSTER.",
+      "utfall": "behov",
+      "omrade": "anfall_bredd"
+    },
+    {
+      "rapport": "B",
+      "match": "Höör",
+      "text": "[SPELARE] gör fantastiska inspring men mycket förgäves.",
+      "utfall": "behov",
+      "omrade": "anfall_bredd",
+      "osaker": true,
+      "kommentar": "Lagbehov (inspringen hittas inte) inbakat i spelaromdöme"
+    },
+    {
+      "rapport": "B",
+      "match": "Höör",
+      "text": "Dags att ge henne 9-plats istället, hon kommer bort på kanten.",
+      "utfall": "spelare",
+      "omrade": null
+    },
+    {
+      "rapport": "B",
+      "match": "Höör",
+      "text": "[SPELARE], [SPELARE], [SPELARE], [SPELARE] gör en bra match och sköter sig väldigt bra i försvaret, rör sig bra i anfallet.",
+      "utfall": "spelare",
+      "omrade": null
+    },
+    {
+      "rapport": "B",
+      "match": "Höör",
+      "text": "Vi kastar bort lite bollar och de kan rycka till sig en lite större ledning.",
+      "utfall": "behov",
+      "omrade": "bollhantering"
+    },
+    {
+      "rapport": "B",
+      "match": "Höör",
+      "text": "Men ändå håller bra takt med dem i andra.",
+      "utfall": "styrka",
+      "omrade": "installning",
+      "osaker": true
+    },
+    {
+      "rapport": "B",
+      "match": "Höör",
+      "text": "Kanske någon nivå 1 spelare till mot så pass bra motstånd, men det är bara en tanke.",
+      "utfall": "kontext",
+      "omrade": null
+    },
+    {
+      "rapport": "B",
+      "match": "Höör",
+      "text": "Alla spelare gjorde en väldigt bra match mot kvalificerat motstånd.",
+      "utfall": "styrka",
+      "omrade": "installning",
+      "osaker": true
+    },
+    {
+      "rapport": "B",
+      "match": "Höör",
+      "text": "Försvaret fick bilden på avvaktande spel vilket var fantastiskt att se.",
+      "utfall": "styrka",
+      "omrade": "forsvar_struktur"
+    },
+    {
+      "rapport": "C",
+      "match": "Tollarp",
+      "text": "Men handbollsmässigt var det tufft men ändå bra träning.",
+      "utfall": "kontext",
+      "omrade": null
+    },
+    {
+      "rapport": "C",
+      "match": "Tollarp",
+      "text": "Upplevde stämningen inför första matchen som utmärkt, lagmässigt kul gäng.",
+      "utfall": "styrka",
+      "omrade": "installning"
+    },
+    {
+      "rapport": "C",
+      "match": "Tollarp",
+      "text": "Dock är det ett gäng som periodvis började fokusera på saker de inte kan påverka.",
+      "utfall": "behov",
+      "omrade": "matchstart_fokus"
+    },
+    {
+      "rapport": "C",
+      "match": "Tollarp",
+      "text": "För mycket fokus på domare, spelare, vad andra säger, var man vill spela och inte spela, när man får komma in.",
+      "utfall": "behov",
+      "omrade": "matchstart_fokus"
+    },
+    {
+      "rapport": "C",
+      "match": "Tollarp",
+      "text": "Tollarp hade en del korta tjejer men mycket i rörelse och kontringar.",
+      "utfall": "kontext",
+      "omrade": null
+    },
+    {
+      "rapport": "C",
+      "match": "Tollarp",
+      "text": "Vi jobbade inte hem när vi avslutade.",
+      "utfall": "behov",
+      "omrade": "kontringsforsvar"
+    },
+    {
+      "rapport": "C",
+      "match": "Tollarp",
+      "text": "1 lång duktig tjej som bara spelade vh9. Drog hela Tollarp framåt.",
+      "utfall": "behov",
+      "omrade": "forsvar_distans",
+      "osaker": true,
+      "kommentar": "Beskriver motståndaren, pekar på eget behov mot vänsternio"
+    },
+    {
+      "rapport": "C",
+      "match": "Tollarp",
+      "text": "Vi hade avvaktande start. För analyserande och långsamma.",
+      "utfall": "behov",
+      "omrade": "matchstart_fokus"
+    },
+    {
+      "rapport": "C",
+      "match": "Tollarp",
+      "text": "Vi försökte passa snabbt men vi tappar bollen för mycket.",
+      "utfall": "behov",
+      "omrade": "bollhantering"
+    },
+    {
+      "rapport": "C",
+      "match": "Tollarp",
+      "text": "Det samt hemspring avgör matchen.",
+      "utfall": "behov",
+      "omrade": "kontringsforsvar"
+    },
+    {
+      "rapport": "C",
+      "match": "Tollarp",
+      "text": "7 bollar ner var egentligen helt görbart.",
+      "utfall": "kontext",
+      "omrade": null
+    },
+    {
+      "rapport": "C",
+      "match": "Karlskrona",
+      "text": "Karlskrona förlorade med 6 bollar mot Tollarp. Men när vi möter Karlskrona är alla spelarna utbytta.",
+      "utfall": "kontext",
+      "omrade": null
+    },
+    {
+      "rapport": "C",
+      "match": "Karlskrona",
+      "text": "Karlskrona-matchen började lika stelt.",
+      "utfall": "behov",
+      "omrade": "matchstart_fokus"
+    },
+    {
+      "rapport": "C",
+      "match": "Karlskrona",
+      "text": "Två långa tjejer vh9 gör det mesta och vi kan inte stoppa dem även om de gör typ samma rörelse varje gång.",
+      "utfall": "behov",
+      "omrade": "forsvar_distans"
+    },
+    {
+      "rapport": "C",
+      "match": "Karlskrona",
+      "text": "I början av andra halvlek vinner vi 12,5 min med en boll. Helt annan inställning.",
+      "utfall": "styrka",
+      "omrade": "installning"
+    },
+    {
+      "rapport": "C",
+      "match": "Karlskrona",
+      "text": "Där pressade vi dem fint.",
+      "utfall": "styrka",
+      "omrade": "forsvar_press"
+    },
+    {
+      "rapport": "C",
+      "match": "Karlskrona",
+      "text": "Sen orkar man inte sista 12,5 min.",
+      "utfall": "behov",
+      "omrade": "fysik"
+    },
+    {
+      "rapport": "C",
+      "match": null,
+      "text": "[SPELARE] behöver gå fram mer när bollen kastas ut.",
+      "utfall": "spelare",
+      "omrade": null,
+      "osaker": true,
+      "kommentar": "Målvaktsobservation: hör hemma i Tracker, inte i lagets analys"
+    },
+    {
+      "rapport": "C",
+      "match": null,
+      "text": "[SPELARE] fenomenal på linjen. Rycker, sliter och drar.",
+      "utfall": "spelare",
+      "omrade": null
+    },
+    {
+      "rapport": "C",
+      "match": null,
+      "text": "[SPELARE] tittar upp och fördelar men det behövs mer rörelse i laget och egna genombrott.",
+      "utfall": "behov",
+      "omrade": "anfall_fart",
+      "osaker": true,
+      "kommentar": "Lagbehov inbakat i spelaromdöme"
+    },
+    {
+      "rapport": "C",
+      "match": null,
+      "text": "[SPELARE] kommer för nära och försöker för mycket själv. Ligger för nära i anfallet.",
+      "utfall": "spelare",
+      "omrade": null,
+      "osaker": true,
+      "kommentar": "Kan vara lagbehov: avstånd och ytor i anfallet"
+    },
+    {
+      "rapport": "C",
+      "match": null,
+      "text": "[SPELARE] sprang hem bättre i andra matchen men behöver jobba mer med det.",
+      "utfall": "spelare",
+      "omrade": null,
+      "osaker": true,
+      "kommentar": "Kopplar till kontringsforsvar"
+    },
+    {
+      "rapport": "C",
+      "match": null,
+      "text": "[SPELARE] svårt med bollmottagningen. Gör de bästa inspringen.",
+      "utfall": "spelare",
+      "omrade": null
+    },
+    {
+      "rapport": "C",
+      "match": null,
+      "text": "[SPELARE] fick ta den tuffaste vh9 i försvaret. Hon gör det mycket bra.",
+      "utfall": "spelare",
+      "omrade": null
+    }
+  ]
+}
