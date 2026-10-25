@@ -93,6 +93,7 @@
     padding: 14px 15px; font-size: 16px; font-weight: 600; margin-bottom: 4px;
     transition: var(--tap);
   }
+  a.navlink { text-decoration: none; box-sizing: border-box; }
   .navlink .ic { width: 22px; text-align: center; font-size: 18px; }
   .navlink .ic svg { width: 19px; height: 19px; display: block; margin: 0 auto; }
   .navlink:active { transform: scale(0.97); }
@@ -707,6 +708,7 @@
   <button class="navlink" data-nav="vCups"><span class="ic" data-svg="trophy"></span>Cuper</button>
   <button class="navlink" data-nav="vBank"><span class="ic" data-svg="book"></span>Lagbank</button>
   <button class="navlink" data-nav="vHelp"><span class="ic">?</span>Hjälp</button>
+  <a class="navlink" id="templateLink" title="Ladda ner statistikmall (PDF)" href="malvaktsstatistik-mall.pdf" download="malvaktsstatistik-mall.pdf"><span class="ic">⬇</span><span>Ladda ner mall</span></a>
   <div class="spacer"></div>
   <div class="storage-meter" id="storageMeter">
     <div class="sm-top"><span class="sm-label">Lagring</span><span class="sm-val" id="smVal">–</span></div>

@@ -6,7 +6,8 @@ const CACHE_PREFIX = 'handboll-tracker-v';
 const CACHE_NAME = CACHE_PREFIX + APP_VERSION;
 const FILES_TO_CACHE = [
   './handball_g_trk_ipad.html',
-  './manifest.json'
+  './manifest.json',
+  './malvaktsstatistik-mall.pdf'
 ];
 
 self.addEventListener('install', function(event) {
