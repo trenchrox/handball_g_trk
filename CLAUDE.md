@@ -149,6 +149,7 @@ Appen har **ingen PIN och ingen inloggning**, och det är avsiktligt. `#login` �
 
 ## Arbetssätt
 
+- **Fråga alltid före commit och push.** Efter varje ändring: beskriv vad som ändrats och fråga om det ska pushas till repot. Committa och pusha inte på eget initiativ, så att småändringar kan samlas i en push. Skapa aldrig PR utan att användaren ber om det.
 - Läs bara de delar av HTML-filen som behövs (den är stor, och rad 1041–1042 och typsnittsraderna är enorma base64-rader). Använd `grep -n` för att hitta funktioner, och undvik att skriva ut hela rader.
 - Verifiera ändringar genom att öppna filen i en webbläsare (t.ex. Playwright med Chromium). Testa både tomt tillstånd (login) och med data, i både mörkt och ljust tema, samt i stående och liggande format.
 - Behåll gammal data bakåtkompatibel: lägg till fält med standardvärden i `normalizeRoot()` i stället för att kräva ny data.
