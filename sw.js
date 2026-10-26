@@ -1,5 +1,5 @@
 // Service worker för offline-stöd av Handboll Tracker
-const CACHE_NAME = 'handboll-tracker-v1';
+const CACHE_NAME = 'handboll-tracker-v2';
 const FILES_TO_CACHE = [
   './handball_g_trk_ipad.html',
   './manifest.json'
