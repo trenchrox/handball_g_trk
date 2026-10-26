@@ -94,7 +94,8 @@ player = { id, placements: [], ...fält från playerEditor }
 
 match = { id, oppId, date, gkId, gk, shots: [shot], halfLen, fullLen,
           clockSec, clockRunning, clockStartedAt?, gkInClock, home,
-          scoreOwn, scoreOpp, kind, period?, locked? }
+          scoreOwn, scoreOpp, kind, period?, locked?,
+          entry? }        // entry:'manual' = efterrapport från statistikmallen (saknar pos/type, klocka och halvlek; se #vMatch.manual)
 
 shot  = { id, t, zone, pos, type, saved, shotGk, period, clock,
           breakthrough?, out? }
@@ -135,7 +136,7 @@ Jämförelsen mellan Tracker, Teambuilder och Playbook (lika, skiljer, vad som k
 
 ## Versionering
 
-- Versionen står i **en enda konstant**: `const APP_VERSION = '2.6'` överst i scriptet i `handball_g_trk_ipad.html`. Den visas i sidomenyn (`#appVersion`, som `v2.6`) och styr service workerns cache (se nedan). Ändra den inte på något annat ställe.
+- Versionen står i **en enda konstant**: `const APP_VERSION = '2.7'` överst i scriptet i `handball_g_trk_ipad.html`. Den visas i sidomenyn (`#appVersion`, som `v2.7`) och styr service workerns cache (se nedan). Ändra den inte på något annat ställe.
 - **Regel:**
   - **Andra siffran höjs** vid nya funktioner och fixar (2.4 → 2.5).
   - **Första siffran höjs** när IndexedDB-datamodellen ändras (2.x → 3.0). Då krävs **alltid en migrering** av befintlig data (`normalizeRoot()` och/eller en riktig `onupgradeneeded`).
@@ -145,7 +146,7 @@ Jämförelsen mellan Tracker, Teambuilder och Playbook (lika, skiljer, vad som k
 
 ## Service worker (`sw.js`)
 
-- **Cachenamn:** `handboll-tracker-v` + `APP_VERSION`, t.ex. `handboll-tracker-v2.6`. Versionen läses ur `sw.js`:s egen URL. HTML-filen registrerar `sw.js?v=<APP_VERSION>`. Ny version ger alltså ny URL, en ny service worker och en ny cache. **Ändra aldrig versionen i `sw.js`.** Där finns ingen hårdkodad version. Saknas `?v=` används `0`.
+- **Cachenamn:** `handboll-tracker-v` + `APP_VERSION`, t.ex. `handboll-tracker-v2.7`. Versionen läses ur `sw.js`:s egen URL. HTML-filen registrerar `sw.js?v=<APP_VERSION>`. Ny version ger alltså ny URL, en ny service worker och en ny cache. **Ändra aldrig versionen i `sw.js`.** Där finns ingen hårdkodad version. Saknas `?v=` används `0`.
 - **Förcachas vid install** (`FILES_TO_CACHE`): `./handball_g_trk_ipad.html` och `./manifest.json`, hämtade med `cache: 'reload'` så att webbläsarens HTTP-cache inte ger en gammal fil. `sw.js` själv cachas inte.
 - **install:** `cache.addAll(...)` och sedan `self.skipWaiting()`.
 - **activate:** raderar bara Cache API-cacher vars namn börjar med `handboll-tracker-v` och inte är den aktuella, och anropar sedan `clients.claim()`. **Det rör aldrig IndexedDB eller localStorage.** Koden använder bara `caches.keys()` och `caches.delete()`, så användarnas data påverkas inte av en ny version.
