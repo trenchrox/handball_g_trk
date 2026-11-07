@@ -150,8 +150,9 @@ Jämförelsen mellan Tracker, Teambuilder och Playbook (lika, skiljer, vad som k
 - **Förcachas vid install** (`FILES_TO_CACHE`): `./handball_g_trk_ipad.html` och `./manifest.json`, hämtade med `cache: 'reload'` så att webbläsarens HTTP-cache inte ger en gammal fil. `sw.js` själv cachas inte.
 - **install:** `cache.addAll(...)` och sedan `self.skipWaiting()`.
 - **activate:** raderar bara Cache API-cacher vars namn börjar med `handboll-tracker-v` och inte är den aktuella, och anropar sedan `clients.claim()`. **Det rör aldrig IndexedDB eller localStorage.** Koden använder bara `caches.keys()` och `caches.delete()`, så användarnas data påverkas inte av en ny version.
-- **fetch:** *cache-first*. Hittas svaret i cachen returneras det. Annars hämtas det från nätet och en kopia läggs i den aktuella cachen. Vid nätfel returneras den cachade huvudsidan.
-- **Följd:** eftersom fetch är cache-first måste versionen höjas för att ändrad HTML ska nå användarna (se Versionering).
+- **fetch:** *nätverk-först för HTML, cache-först för allt annat.* HTML-sidan hämtas alltid från nätet när det går, och en kopia läggs i den aktuella cachen; vid nätfel används den cachade sidan. Övriga filer (manifest, statistikmallen) tas ur cachen först och hämtas annars från nätet.
+  - **Varför HTML är nätverk-först:** med cache-först hela vägen serveras den gamla HTML-filen ur cachen, den registrerar samma `sw.js?v=`-URL, webbläsaren ser ingen ändring av `sw.js` och cachen byts aldrig ut. En höjd `APP_VERSION` når då aldrig en iPad som redan har appen. Verifierat i Chromium: med cache-först satt en installerad v2.9 kvar på v2.9 i tre besök efter att v2.10 lagts ut.
+- **Följd:** höj alltid `APP_VERSION` vid ändringar (se Versionering). Den styr cachenamnet, och en enhet som varit offline får den nya filen vid nästa besök online.
 
 ## Servering
 

@@ -4,8 +4,9 @@
 const APP_VERSION = new URL(self.location.href).searchParams.get('v') || '0';
 const CACHE_PREFIX = 'handboll-tracker-v';
 const CACHE_NAME = CACHE_PREFIX + APP_VERSION;
+const MAIN = './handball_g_trk_ipad.html';
 const FILES_TO_CACHE = [
-  './handball_g_trk_ipad.html',
+  MAIN,
   './manifest.json',
   './malvaktsstatistik-mall.pdf'
 ];
@@ -33,20 +34,47 @@ self.addEventListener('activate', function(event) {
   self.clients.claim();
 });
 
+function isHtml(request) {
+  return request.mode === 'navigate' ||
+         (request.headers.get('accept') || '').indexOf('text/html') >= 0;
+}
+
 self.addEventListener('fetch', function(event) {
+  var req = event.request;
+  if (req.method !== 'GET') return;
+
+  // Appen hämtas nätverk-först. Annars skulle en ny version aldrig nå en iPad
+  // som redan har appen: den gamla HTML-filen serveras ur cachen, den
+  // registrerar samma sw.js?v=-URL, webbläsaren ser ingen ändring, och cachen
+  // byts aldrig ut. Nätverk-först bryter den låsningen.
+  if (isHtml(req)) {
+    event.respondWith(
+      fetch(req).then(function(response) {
+        var copy = response.clone();
+        caches.open(CACHE_NAME).then(function(cache) { cache.put(req, copy); });
+        return response;
+      }).catch(function() {
+        // Offline: ta den cachade appen
+        return caches.match(req).then(function(hit) { return hit || caches.match(MAIN); });
+      })
+    );
+    return;
+  }
+
+  // Allt annat (manifest, statistikmallen) cache-först — ändras sällan och ska gå snabbt.
   event.respondWith(
-    caches.match(event.request).then(function(cached) {
+    caches.match(req).then(function(cached) {
       if (cached) return cached;
-      return fetch(event.request).then(function(response) {
+      return fetch(req).then(function(response) {
         // Spara en kopia av nya filer i cachen för nästa offline-tillfälle
         var copy = response.clone();
         caches.open(CACHE_NAME).then(function(cache) {
-          cache.put(event.request, copy);
+          cache.put(req, copy);
         });
         return response;
       }).catch(function() {
         // Om både cache och nätverk saknas: fall tillbaka på huvudsidan
-        return caches.match('./handball_g_trk_ipad.html');
+        return caches.match(MAIN);
       });
     })
   );
