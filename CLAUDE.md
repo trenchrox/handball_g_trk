@@ -175,3 +175,10 @@ Jämförelsen mellan Tracker, Teambuilder och Playbook (lika, skiljer, vad som k
 - Verifiera ändringar genom att öppna filen i en webbläsare (t.ex. Playwright med Chromium). Testa både tomt tillstånd (login) och med data, i både mörkt och ljust tema, samt i stående och liggande format.
 - Behåll gammal data bakåtkompatibel: lägg till fält med standardvärden i `normalizeRoot()` i stället för att kräva ny data.
 - Commit-meddelanden på svenska.
+
+## Gemensam ID- och datastandard
+
+`suite-schema.md` i repots rot är sviteövergripande ID- och dataformat (version 1, med tillägg 2026-11-18): ID-prefix, övningskoder, dataformat för träningsgrupper, övningar, pass och planbilder (`diagram@1`) samt export och import.
+
+- Filen är en **kopia** som ska vara lika i alla repon (PracticePlanner, Playbook, Tracker, Teambuilder, Match Summary och handbollssviten). Ändra den inte här för sig: uppdatera alla kopior samtidigt.
+- Standarden gäller **nya** ID:n och de format apparna utbyter. Tracker följer den inte fullt ut än: befintliga ID:n har andra format och får inte ändras utan migrering.
